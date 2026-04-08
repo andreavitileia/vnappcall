@@ -146,7 +146,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val dateStr = if (notes.isNotEmpty()) PortalSync.formatDate(notes.first().timestamp) else PortalSync.formatDate(System.currentTimeMillis())
                 val ok = PortalSync.uploadReport(settings.portalUrl, settings.apiKey, dateStr, notes)
                 _snackbar.value = if (ok) "Sincronizzato con il portale!" else "Errore sincronizzazione portale"
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 _snackbar.value = "Errore sync: ${e.message ?: "errore sconosciuto"}"
             } finally {
                 _loading.value = false
@@ -167,7 +167,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val count = PortalSync.bulkSync(settings.portalUrl, settings.apiKey, byDate) { _, _ -> }
                     _snackbar.value = "Sync completato: $count/${byDate.size} giorni inviati"
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 _snackbar.value = "Errore sync: ${e.message ?: "errore sconosciuto"}"
             } finally {
                 _loading.value = false

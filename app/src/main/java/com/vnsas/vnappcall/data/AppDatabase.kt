@@ -38,6 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "vnappcall.db"
                 )
                     .addMigrations(MIGRATION_1_2)
+                    .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }
             }

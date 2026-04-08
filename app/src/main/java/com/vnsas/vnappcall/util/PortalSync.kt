@@ -23,25 +23,43 @@ object PortalSync {
         if (portalUrl.isBlank() || apiKey.isBlank()) return@withContext false
 
         try {
+            val dfTime = SimpleDateFormat("HH:mm", Locale.getDefault())
             val rows = JSONArray()
             for (item in items) {
+                val machines = JSONArray()
+                if (item.serial.isNotBlank()) {
+                    item.serial.split(",").forEach { s ->
+                        val parts = s.trim().split("|")
+                        val machine = JSONObject().apply {
+                            put("serial", parts.getOrElse(0) { "" })
+                            put("model", parts.getOrElse(1) { "" })
+                        }
+                        machines.put(machine)
+                    }
+                }
+
                 val row = JSONObject().apply {
                     put("timestamp", item.timestamp)
+                    put("time", dfTime.format(Date(item.timestamp)))
                     put("contactName", item.contactName)
                     put("phone", item.phone)
                     put("durationSec", item.durationSec)
+                    put("durationFormatted", "%d:%02d".format(
+                        item.durationSec / 60, item.durationSec % 60
+                    ))
                     put("note", item.note)
                     put("billable", item.billable)
                     put("resolved", item.resolved)
-                    val serials = if (item.serial.isBlank()) JSONArray()
-                    else JSONArray(item.serial.split(",").map { it.trim() })
-                    put("serials", serials)
+                    put("machines", machines)
                 }
                 rows.put(row)
             }
 
             val payload = JSONObject().apply {
                 put("date", dateStr)
+                put("totalCalls", items.size)
+                put("billableCount", items.count { it.billable })
+                put("resolvedCount", items.count { it.resolved })
                 put("rows", rows)
             }
 
@@ -62,7 +80,7 @@ object PortalSync {
             val code = conn.responseCode
             conn.disconnect()
             code in 200..299
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             false
         }
     }
@@ -77,7 +95,11 @@ object PortalSync {
         val dates = notesByDate.keys.sorted()
         for ((i, date) in dates.withIndex()) {
             val items = notesByDate[date] ?: continue
-            if (uploadReport(portalUrl, apiKey, date, items)) success++
+            try {
+                if (uploadReport(portalUrl, apiKey, date, items)) success++
+            } catch (_: Throwable) {
+                // Skip failed dates, continue with rest
+            }
             onProgress(i + 1, dates.size)
         }
         success

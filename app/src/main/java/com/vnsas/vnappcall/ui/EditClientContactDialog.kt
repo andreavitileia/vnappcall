@@ -17,6 +17,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,7 +29,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
@@ -41,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.vnsas.vnappcall.MainViewModel
 import com.vnsas.vnappcall.data.ClientContact
 import com.vnsas.vnappcall.data.SerialEntry
+import com.vnsas.vnappcall.ui.theme.VNGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,77 +94,129 @@ fun EditClientContactDialog(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // Name field with rubrica button
+            // Name + rubrica picker
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedTextField(
-                    value = name, onValueChange = { name = it },
+                    value = name,
+                    onValueChange = { name = it },
                     label = { Text("Nome cliente") },
-                    modifier = Modifier.weight(1f), singleLine = true,
-                    shape = fieldShape, colors = fieldColors
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    shape = fieldShape,
+                    colors = fieldColors
                 )
                 IconButton(onClick = { showPhonePicker = true }) {
-                    Icon(Icons.Default.Contacts, "Da rubrica", tint = MaterialTheme.colorScheme.primary)
+                    Icon(
+                        Icons.Default.Contacts,
+                        "Da rubrica",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
 
             Spacer(Modifier.height(8.dp))
 
             OutlinedTextField(
-                value = phone, onValueChange = { phone = it },
+                value = phone,
+                onValueChange = { phone = it },
                 label = { Text("Telefono") },
-                modifier = Modifier.fillMaxWidth(), singleLine = true,
-                shape = fieldShape, colors = fieldColors
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = fieldShape,
+                colors = fieldColors
             )
 
-            // Machines section
-            Spacer(Modifier.height(16.dp))
-            Text(
-                "Macchine e Seriali",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+            // ===== MACHINES SECTION =====
+            Spacer(Modifier.height(20.dp))
 
-            machines.forEachIndexed { idx, entry ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = entry.number,
-                        onValueChange = { machines[idx] = entry.copy(number = it) },
-                        label = { Text("Seriale") },
-                        modifier = Modifier.weight(1f), singleLine = true,
-                        shape = fieldShape, colors = fieldColors
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = VNGreen.copy(alpha = 0.08f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        "Macchine e Seriali",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = VNGreen
                     )
-                    Spacer(Modifier.width(8.dp))
-                    OutlinedTextField(
-                        value = entry.model,
-                        onValueChange = { machines[idx] = entry.copy(model = it) },
-                        label = { Text("Modello") },
-                        modifier = Modifier.weight(1f), singleLine = true,
-                        shape = fieldShape, colors = fieldColors
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Aggiungi le macchine del cliente con numero seriale e modello",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    IconButton(onClick = { machines.removeAt(idx) }) {
-                        Icon(Icons.Default.Close, "Rimuovi", tint = MaterialTheme.colorScheme.error)
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // Existing machines
+                    machines.forEachIndexed { idx, entry ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = entry.number,
+                                onValueChange = { newVal ->
+                                    machines[idx] = entry.copy(number = newVal)
+                                },
+                                label = { Text("Seriale") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                shape = fieldShape,
+                                colors = fieldColors
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            OutlinedTextField(
+                                value = entry.model,
+                                onValueChange = { newVal ->
+                                    machines[idx] = entry.copy(model = newVal)
+                                },
+                                label = { Text("Modello") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                shape = fieldShape,
+                                colors = fieldColors
+                            )
+                            IconButton(onClick = { machines.removeAt(idx) }) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    "Rimuovi",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+
+                    // Add machine button - prominent
+                    Button(
+                        onClick = { machines.add(SerialEntry()) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = VNGreen,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Aggiungi macchina")
                     }
                 }
-                Spacer(Modifier.height(4.dp))
-            }
-
-            TextButton(onClick = { machines.add(SerialEntry()) }) {
-                Icon(Icons.Default.Add, null, Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Aggiungi macchina")
             }
 
             Spacer(Modifier.height(20.dp))
 
+            // Save / Cancel
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
