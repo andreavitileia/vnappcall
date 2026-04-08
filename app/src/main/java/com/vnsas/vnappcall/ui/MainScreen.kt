@@ -32,7 +32,7 @@ private data class NavItem(val label: String, val icon: ImageVector)
 
 private val navItems = listOf(
     NavItem("Chiamate", Icons.Default.Call),
-    NavItem("Contatti", Icons.Default.People),
+    NavItem("Clienti", Icons.Default.People),
     NavItem("Report", Icons.Default.Description),
     NavItem("Impostazioni", Icons.Default.Settings),
 )

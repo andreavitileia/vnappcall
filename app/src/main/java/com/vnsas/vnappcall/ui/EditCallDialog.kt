@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.vnsas.vnappcall.MainViewModel
 import com.vnsas.vnappcall.data.CallNote
+import com.vnsas.vnappcall.data.ClientContact
 import com.vnsas.vnappcall.data.SerialEntry
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,8 +56,9 @@ fun EditCallDialog(
     var billable by remember { mutableStateOf(note?.billable ?: false) }
     var resolved by remember { mutableStateOf(note?.resolved ?: false) }
     var showContactPicker by remember { mutableStateOf(false) }
+    var showClientPicker by remember { mutableStateOf(false) }
 
-    // Parse existing serials
+    // Parse existing serials from the call note
     val serials = remember {
         val list = mutableStateListOf<SerialEntry>()
         if (note != null && note.serial.isNotBlank()) {
@@ -84,22 +86,26 @@ fun EditCallDialog(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // Contact name + picker
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            // Client contact picker (loads machines automatically)
+            OutlinedButton(
+                onClick = { showClientPicker = true },
+                modifier = Modifier.fillMaxWidth()
             ) {
-                OutlinedTextField(
-                    value = contactName,
-                    onValueChange = { contactName = it },
-                    label = { Text("Nome contatto") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
-                )
-                IconButton(onClick = { showContactPicker = true }) {
-                    Icon(Icons.Default.People, "Scegli contatto")
-                }
+                Icon(Icons.Default.People, null)
+                Spacer(Modifier.width(8.dp))
+                Text(if (contactName.isBlank()) "Seleziona cliente" else "Cliente: $contactName")
             }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Contact name (manual or from picker)
+            OutlinedTextField(
+                value = contactName,
+                onValueChange = { contactName = it },
+                label = { Text("Nome contatto") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
 
             Spacer(Modifier.height(8.dp))
 
@@ -226,6 +232,26 @@ fun EditCallDialog(
                 contactName = contact.name
                 phone = contact.phone
                 showContactPicker = false
+            }
+        )
+    }
+
+    if (showClientPicker) {
+        ClientContactPickerDialog(
+            vm = vm,
+            onDismiss = { showClientPicker = false },
+            onSelect = { client ->
+                contactName = client.name
+                phone = client.phone
+                // Load machines from client contact
+                serials.clear()
+                if (client.machines.isNotBlank()) {
+                    client.machines.split(",").forEach { s ->
+                        val parts = s.trim().split("|")
+                        serials.add(SerialEntry(parts.getOrElse(0) { "" }, parts.getOrElse(1) { "" }))
+                    }
+                }
+                showClientPicker = false
             }
         )
     }

@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vnsas.vnappcall.data.CallNote
 import com.vnsas.vnappcall.data.CallNoteDao
+import com.vnsas.vnappcall.data.ClientContact
+import com.vnsas.vnappcall.data.ClientContactDao
 import com.vnsas.vnappcall.data.MailSettings
 import com.vnsas.vnappcall.data.loadMailSettings
 import com.vnsas.vnappcall.data.saveMailSettings
@@ -26,6 +28,7 @@ import java.util.Calendar
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dao: CallNoteDao = (application as VNApp).database.callNoteDao()
+    private val contactDao: ClientContactDao = (application as VNApp).database.clientContactDao()
     private val ctx get() = getApplication<VNApp>()
 
     // --- Call notes ---
@@ -64,13 +67,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- Contacts ---
+    // --- Phone contacts (system) ---
     private val _contacts = MutableStateFlow<List<PhoneContact>>(emptyList())
     val contacts: StateFlow<List<PhoneContact>> = _contacts.asStateFlow()
 
     fun refreshContacts() {
         viewModelScope.launch {
             _contacts.value = ContactsReader.loadAll(ctx)
+        }
+    }
+
+    // --- Client contacts (local DB with machines/serials) ---
+    val clientContacts: StateFlow<List<ClientContact>> = contactDao.observeAll()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    fun upsertClientContact(contact: ClientContact) {
+        viewModelScope.launch { contactDao.upsert(contact) }
+    }
+
+    fun deleteClientContact(contact: ClientContact) {
+        viewModelScope.launch { contactDao.delete(contact) }
+    }
+
+    fun findClientByPhone(phone: String, callback: (ClientContact?) -> Unit) {
+        viewModelScope.launch {
+            val result = contactDao.findByPhone(phone)
+            callback(result)
         }
     }
 
