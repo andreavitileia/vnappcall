@@ -54,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vnsas.vnappcall.MainViewModel
@@ -335,15 +336,44 @@ private fun CallLogCard(
                     }
                 }
 
-                // Annotation indicator
+                // Annotation indicator - clear text badges
                 if (note != null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (note.billable) StatusBadge(
-                            Icons.Default.Edit, VNOrange
-                        )
-                        if (note.resolved) StatusBadge(
-                            Icons.Default.Edit, VNGreen
-                        )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (note.billable) {
+                            Text(
+                                "\u20AC",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(VNOrange)
+                                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                            )
+                        }
+                        if (note.resolved) {
+                            Text(
+                                "\u2713",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(VNGreen)
+                                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                            )
+                        }
+                        if (note.serial.isNotBlank()) {
+                            Text(
+                                "\uD83D\uDD27",
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .padding(horizontal = 5.dp, vertical = 1.dp)
+                            )
+                        }
                     }
                 }
 
@@ -374,23 +404,50 @@ private fun CallLogCard(
                             )
                         }
                         if (note.serial.isNotBlank()) {
-                            Text(
-                                "Seriali: ${note.serial}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            val machinesList = note.serial.split(",").map { s ->
+                                val parts = s.trim().split("|")
+                                val sn = parts.getOrElse(0) { "" }
+                                val model = parts.getOrElse(1) { "" }
+                                if (model.isNotBlank()) "$model (SN: $sn)" else "SN: $sn"
+                            }
+                            Column(modifier = Modifier.padding(bottom = 4.dp)) {
+                                Text(
+                                    "Macchine:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = VNGreen,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                machinesList.forEach { machine ->
+                                    Text(
+                                        "  \u2022 $machine",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
-                        Row {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             if (note.billable) Text(
-                                "Da fatturare",
+                                "\u20AC Da fatturare",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = VNOrange,
-                                modifier = Modifier.padding(end = 8.dp)
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(VNOrange)
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
                             )
                             if (note.resolved) Text(
-                                "Risolto",
+                                "\u2713 Risolto",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = VNGreen
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(VNGreen)
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
                             )
                         }
                     }

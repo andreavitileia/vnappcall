@@ -91,8 +91,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun findClientByPhone(phone: String, callback: (ClientContact?) -> Unit) {
         viewModelScope.launch {
-            val result = contactDao.findByPhone(phone)
-            callback(result)
+            try {
+                val stripped = phone.replace(Regex("[^0-9+]"), "")
+                if (stripped.length < 4) {
+                    callback(null)
+                    return@launch
+                }
+                val suffix = stripped.takeLast(7)
+                val all = contactDao.getAll()
+                val match = all.find { client ->
+                    val clientDigits = client.phone.replace(Regex("[^0-9+]"), "")
+                    clientDigits.takeLast(7) == suffix
+                }
+                callback(match)
+            } catch (_: Throwable) {
+                callback(null)
+            }
         }
     }
 

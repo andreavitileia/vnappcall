@@ -21,6 +21,7 @@ object PortalSync {
         items: List<CallNote>
     ): Boolean = withContext(Dispatchers.IO) {
         if (portalUrl.isBlank() || apiKey.isBlank()) return@withContext false
+        if (!portalUrl.startsWith("http")) return@withContext false
 
         try {
             val dfTime = SimpleDateFormat("HH:mm", Locale.getDefault())

@@ -19,7 +19,10 @@ interface ClientContactDao {
     fun observeAll(): Flow<List<ClientContact>>
 
     @Query("SELECT * FROM client_contacts WHERE phone = :phone LIMIT 1")
-    suspend fun findByPhone(phone: String): ClientContact?
+    suspend fun findByPhoneExact(phone: String): ClientContact?
+
+    @Query("SELECT * FROM client_contacts ORDER BY name ASC")
+    suspend fun getAll(): List<ClientContact>
 
     @Query("SELECT * FROM client_contacts WHERE name LIKE '%' || :query || '%' OR phone LIKE '%' || :query || '%' ORDER BY name ASC")
     suspend fun search(query: String): List<ClientContact>

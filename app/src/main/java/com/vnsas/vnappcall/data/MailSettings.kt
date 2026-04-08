@@ -13,7 +13,7 @@ data class MailSettings(
     val autoEnabled: Boolean = false,
     val autoHour: Int = 8,
     val autoMinute: Int = 0,
-    val portalUrl: String = "",
+    val portalUrl: String = "https://king-prawn-app-ugucb.ondigitalocean.app",
     val apiKey: String = "vnappcall-reports-key-2025"
 )
 
@@ -32,7 +32,7 @@ fun Context.loadMailSettings(): MailSettings {
         autoEnabled = p.getBoolean("autoEnabled", false),
         autoHour = p.getInt("autoHour", 8),
         autoMinute = p.getInt("autoMinute", 0),
-        portalUrl = p.getString("portalUrl", "") ?: "",
+        portalUrl = p.getString("portalUrl", "https://king-prawn-app-ugucb.ondigitalocean.app") ?: "https://king-prawn-app-ugucb.ondigitalocean.app",
         apiKey = p.getString("apiKey", "vnappcall-reports-key-2025") ?: "vnappcall-reports-key-2025"
     )
 }
