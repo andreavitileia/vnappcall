@@ -92,7 +92,10 @@ fun EditClientContactDialog(
                     modifier = Modifier.weight(1f),
                     singleLine = true
                 )
-                IconButton(onClick = { showPhonePicker = true }) {
+                IconButton(onClick = {
+                    vm.refreshContacts()
+                    showPhonePicker = true
+                }) {
                     Icon(Icons.Default.People, "Da rubrica")
                 }
             }
