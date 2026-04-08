@@ -27,9 +27,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -82,17 +80,16 @@ fun CallsTab(vm: MainViewModel) {
                 .padding(padding)
                 .padding(horizontal = 16.dp)
         ) {
-            SingleChoiceSegmentedButtonRow(
-                modifier = Modifier.fillMaxWidth()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 listOf("Oggi", "Tutte").forEachIndexed { idx, label ->
-                    SegmentedButton(
+                    FilterChip(
                         selected = filter == idx,
                         onClick = { filter = idx },
-                        shape = SegmentedButtonDefaults.itemShape(index = idx, count = 2)
-                    ) {
-                        Text(label)
-                    }
+                        label = { Text(label) }
+                    )
                 }
             }
 

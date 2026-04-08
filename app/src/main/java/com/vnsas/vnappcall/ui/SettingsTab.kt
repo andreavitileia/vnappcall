@@ -15,7 +15,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -151,7 +151,7 @@ fun SettingsTab(vm: MainViewModel) {
                 Text("Invia email di test")
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            Divider(modifier = Modifier.padding(vertical = 4.dp))
 
             // Auto report
             SectionTitle("Report Automatico")
@@ -185,7 +185,7 @@ fun SettingsTab(vm: MainViewModel) {
                 )
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            Divider(modifier = Modifier.padding(vertical = 4.dp))
 
             // Portal
             SectionTitle("Portale Web")
