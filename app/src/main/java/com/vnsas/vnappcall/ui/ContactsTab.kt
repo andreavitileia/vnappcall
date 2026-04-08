@@ -27,9 +27,13 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,8 +42,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,15 +57,32 @@ import androidx.compose.ui.unit.dp
 import com.vnsas.vnappcall.MainViewModel
 import com.vnsas.vnappcall.data.ClientContact
 import com.vnsas.vnappcall.data.SerialEntry
+import com.vnsas.vnappcall.util.PhoneContact
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContactsTab(vm: MainViewModel) {
+    val phoneContacts by vm.contacts.collectAsState()
     val clientContacts by vm.clientContacts.collectAsState()
     var query by remember { mutableStateOf("") }
+    var viewMode by remember { mutableIntStateOf(0) } // 0=rubrica, 1=clienti
     var showDialog by remember { mutableStateOf(false) }
     var editContact by remember { mutableStateOf<ClientContact?>(null) }
 
-    val filtered = remember(clientContacts, query) {
+    // Auto-load phone contacts
+    LaunchedEffect(Unit) {
+        vm.refreshContacts()
+    }
+
+    val filteredPhone = remember(phoneContacts, query) {
+        if (query.isBlank()) phoneContacts
+        else phoneContacts.filter {
+            it.name.contains(query, ignoreCase = true) ||
+            it.phone.contains(query)
+        }
+    }
+
+    val filteredClients = remember(clientContacts, query) {
         if (query.isBlank()) clientContacts
         else clientContacts.filter {
             it.name.contains(query, ignoreCase = true) ||
@@ -71,28 +94,42 @@ fun ContactsTab(vm: MainViewModel) {
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
                 Spacer(Modifier.height(16.dp))
-                Text(
-                    "Clienti",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        "Contatti",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    IconButton(onClick = { vm.refreshContacts() }) {
+                        Icon(
+                            Icons.Default.Refresh, "Aggiorna",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "${clientContacts.size} clienti registrati",
+                    "${phoneContacts.size} contatti  \u2022  ${clientContacts.size} clienti",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
             }
+
+            // Search
             item {
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("Cerca cliente, telefono o seriale...") },
+                    placeholder = { Text("Cerca contatto o cliente...") },
                     leadingIcon = {
                         Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     },
@@ -107,50 +144,121 @@ fun ContactsTab(vm: MainViewModel) {
                 )
                 Spacer(Modifier.height(4.dp))
             }
-            if (filtered.isEmpty()) {
-                item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            Icons.Default.People, null,
-                            Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            if (clientContacts.isEmpty()) "Nessun cliente registrato"
-                            else "Nessun risultato",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        if (clientContacts.isEmpty()) {
-                            Text(
-                                "Premi + per aggiungerne uno",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+
+            // Toggle: Rubrica vs Clienti
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = viewMode == 0,
+                        onClick = { viewMode = 0 },
+                        label = { Text("Rubrica (${filteredPhone.size})", style = MaterialTheme.typography.labelLarge) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    FilterChip(
+                        selected = viewMode == 1,
+                        onClick = { viewMode = 1 },
+                        label = { Text("Clienti (${filteredClients.size})", style = MaterialTheme.typography.labelLarge) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+
+            if (viewMode == 0) {
+                // Phone contacts (Rubrica)
+                if (filteredPhone.isEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                Icons.Default.People, null,
+                                Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                             )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                if (phoneContacts.isEmpty()) "Nessun contatto trovato"
+                                else "Nessun risultato",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (phoneContacts.isEmpty()) {
+                                Text(
+                                    "Verifica i permessi della rubrica",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            }
                         }
                     }
                 }
-            }
-            items(filtered, key = { it.id }) { contact ->
-                ClientContactCard(
-                    contact,
-                    onEdit = { editContact = contact; showDialog = true },
-                    onDelete = { vm.deleteClientContact(contact) }
-                )
+                items(filteredPhone) { contact ->
+                    PhoneContactCard(contact)
+                }
+            } else {
+                // Client contacts (with machines)
+                if (filteredClients.isEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                Icons.Default.People, null,
+                                Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                if (clientContacts.isEmpty()) "Nessun cliente registrato"
+                                else "Nessun risultato",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (clientContacts.isEmpty()) {
+                                Text(
+                                    "Premi + per aggiungerne uno",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                )
+                            }
+                        }
+                    }
+                }
+                items(filteredClients, key = { it.id }) { contact ->
+                    ClientContactCard(
+                        contact,
+                        onEdit = { editContact = contact; showDialog = true },
+                        onDelete = { vm.deleteClientContact(contact) }
+                    )
+                }
             }
             item { Spacer(Modifier.height(80.dp)) }
         }
-        FloatingActionButton(
-            onClick = { editContact = null; showDialog = true },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            shape = CircleShape
-        ) { Icon(Icons.Default.Add, "Nuovo cliente") }
+
+        // FAB for adding client (only in Clienti mode)
+        if (viewMode == 1) {
+            FloatingActionButton(
+                onClick = { editContact = null; showDialog = true },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = CircleShape
+            ) { Icon(Icons.Default.Add, "Nuovo cliente") }
+        }
     }
     if (showDialog) {
         EditClientContactDialog(
@@ -159,6 +267,50 @@ fun ContactsTab(vm: MainViewModel) {
             onDismiss = { showDialog = false },
             onSave = { vm.upsertClientContact(it); showDialog = false }
         )
+    }
+}
+
+@Composable
+private fun PhoneContactCard(contact: PhoneContact) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(40.dp).clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    contact.name.firstOrNull()?.uppercase() ?: "?",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(contact.name, style = MaterialTheme.typography.titleMedium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Phone, null,
+                        Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        contact.phone,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }
 

@@ -141,23 +141,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun syncToPortal(notes: List<CallNote>) {
         viewModelScope.launch {
             _loading.value = true
-            val settings = _mailSettings.value
-            val dateStr = if (notes.isNotEmpty()) PortalSync.formatDate(notes.first().timestamp) else PortalSync.formatDate(System.currentTimeMillis())
-            val ok = PortalSync.uploadReport(settings.portalUrl, settings.apiKey, dateStr, notes)
-            _loading.value = false
-            _snackbar.value = if (ok) "Sincronizzato con il portale!" else "Errore sincronizzazione portale"
+            try {
+                val settings = _mailSettings.value
+                val dateStr = if (notes.isNotEmpty()) PortalSync.formatDate(notes.first().timestamp) else PortalSync.formatDate(System.currentTimeMillis())
+                val ok = PortalSync.uploadReport(settings.portalUrl, settings.apiKey, dateStr, notes)
+                _snackbar.value = if (ok) "Sincronizzato con il portale!" else "Errore sincronizzazione portale"
+            } catch (e: Exception) {
+                _snackbar.value = "Errore sync: ${e.message ?: "errore sconosciuto"}"
+            } finally {
+                _loading.value = false
+            }
         }
     }
 
     fun bulkSyncToPortal(fromMs: Long, toMs: Long) {
         viewModelScope.launch {
             _loading.value = true
-            val settings = _mailSettings.value
-            val notes = dao.getBetween(fromMs, toMs)
-            val byDate = notes.groupBy { PortalSync.formatDate(it.timestamp) }
-            val count = PortalSync.bulkSync(settings.portalUrl, settings.apiKey, byDate) { _, _ -> }
-            _loading.value = false
-            _snackbar.value = "Sync completato: $count/${byDate.size} giorni inviati"
+            try {
+                val settings = _mailSettings.value
+                val notes = dao.getBetween(fromMs, toMs)
+                if (notes.isEmpty()) {
+                    _snackbar.value = "Nessuna nota da sincronizzare nel periodo"
+                } else {
+                    val byDate = notes.groupBy { PortalSync.formatDate(it.timestamp) }
+                    val count = PortalSync.bulkSync(settings.portalUrl, settings.apiKey, byDate) { _, _ -> }
+                    _snackbar.value = "Sync completato: $count/${byDate.size} giorni inviati"
+                }
+            } catch (e: Exception) {
+                _snackbar.value = "Errore sync: ${e.message ?: "errore sconosciuto"}"
+            } finally {
+                _loading.value = false
+            }
         }
     }
 

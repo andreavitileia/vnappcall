@@ -50,6 +50,8 @@ fun ReportTab(vm: MainViewModel) {
     val allNotes by vm.allNotes.collectAsState()
     val context = LocalContext.current
     val today = SimpleDateFormat("dd MMMM yyyy", Locale.ITALIAN).format(Date())
+    val billableToday = todayNotes.count { it.billable }
+    val resolvedToday = todayNotes.count { it.resolved }
 
     Column(
         modifier = Modifier
@@ -79,16 +81,14 @@ fun ReportTab(vm: MainViewModel) {
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "${todayNotes.size} chiamate registrate",
+                    "${todayNotes.size} note registrate",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
                 Spacer(Modifier.height(4.dp))
-                val billableCount = todayNotes.count { it.billable }
-                val resolvedCount = todayNotes.count { it.resolved }
                 Text(
-                    "$billableCount da fatturare  \u2022  $resolvedCount risolte",
+                    "$billableToday da fatturare  \u2022  $resolvedToday risolte",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                 )
@@ -116,7 +116,7 @@ fun ReportTab(vm: MainViewModel) {
                 ) {
                     StatItem("Totale", "${allNotes.size}", MaterialTheme.colorScheme.primary)
                     StatItem("Oggi", "${todayNotes.size}", MaterialTheme.colorScheme.primary)
-                    StatItem("Da fatturare", "${allNotes.count { it.billable }}", VNOrange)
+                    StatItem("Da fatt.", "${allNotes.count { it.billable }}", VNOrange)
                     StatItem("Risolte", "${allNotes.count { it.resolved }}", VNGreen)
                 }
             }
@@ -134,15 +134,17 @@ fun ReportTab(vm: MainViewModel) {
         // Export CSV
         Button(
             onClick = {
-                if (todayNotes.isNotEmpty()) {
-                    val (_, uri) = ReportExporter.exportCsv(context, todayNotes)
-                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/csv"
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                try {
+                    if (todayNotes.isNotEmpty()) {
+                        val (_, uri) = ReportExporter.exportCsv(context, todayNotes)
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/csv"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(shareIntent, "Condividi report"))
                     }
-                    context.startActivity(Intent.createChooser(shareIntent, "Condividi report"))
-                }
+                } catch (_: Exception) { }
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = todayNotes.isNotEmpty(),
@@ -197,18 +199,20 @@ fun ReportTab(vm: MainViewModel) {
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Invia tutti i dati degli ultimi 30 giorni al portale",
+                    "Invia tutte le note degli ultimi 30 giorni al portale",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
                 Button(
                     onClick = {
-                        val cal = Calendar.getInstance()
-                        val end = cal.timeInMillis
-                        cal.add(Calendar.DAY_OF_YEAR, -30)
-                        val start = cal.timeInMillis
-                        vm.bulkSyncToPortal(start, end)
+                        try {
+                            val cal = Calendar.getInstance()
+                            val end = cal.timeInMillis
+                            cal.add(Calendar.DAY_OF_YEAR, -30)
+                            val start = cal.timeInMillis
+                            vm.bulkSyncToPortal(start, end)
+                        } catch (_: Exception) { }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
