@@ -64,31 +64,45 @@ fun EditCallDialog(
     var showClientPicker by remember { mutableStateOf(false) }
     var clientLoaded by remember { mutableStateOf(false) }
 
-    val serials = remember {
-        val list = mutableStateListOf<SerialEntry>()
+    // All machines belonging to the client
+    val clientMachines = remember { mutableStateListOf<SerialEntry>() }
+    // Which machines are selected for THIS call (tracked by index)
+    val selectedIndices = remember { mutableStateListOf<Int>() }
+
+    // Parse existing serials from note to pre-select them
+    val existingSerials = remember {
         if (note != null && note.serial.isNotBlank()) {
-            note.serial.split(",").forEach { s ->
+            note.serial.split(",").map { s ->
                 val parts = s.trim().split("|")
-                list.add(SerialEntry(parts.getOrElse(0) { "" }, parts.getOrElse(1) { "" }))
+                SerialEntry(parts.getOrElse(0) { "" }, parts.getOrElse(1) { "" })
+            }
+        } else emptyList()
+    }
+
+    // Load client machines and pre-select matching ones
+    fun loadMachinesFromClient(machinesStr: String) {
+        clientMachines.clear()
+        selectedIndices.clear()
+        if (machinesStr.isNotBlank()) {
+            machinesStr.split(",").forEachIndexed { idx, s ->
+                val parts = s.trim().split("|")
+                val entry = SerialEntry(parts.getOrElse(0) { "" }, parts.getOrElse(1) { "" })
+                clientMachines.add(entry)
+                // Pre-select if this machine was saved in the note
+                if (existingSerials.any { it.number == entry.number }) {
+                    selectedIndices.add(idx)
+                }
             }
         }
-        list
+        clientLoaded = true
     }
 
     // Auto-search for client by phone when dialog opens
     LaunchedEffect(phone) {
-        if (phone.isNotBlank() && serials.isEmpty() && !clientLoaded) {
+        if (phone.isNotBlank() && !clientLoaded) {
             vm.findClientByPhone(phone) { client ->
                 if (client != null && client.machines.isNotBlank()) {
-                    serials.clear()
-                    client.machines.split(",").forEach { s ->
-                        val parts = s.trim().split("|")
-                        serials.add(SerialEntry(
-                            parts.getOrElse(0) { "" },
-                            parts.getOrElse(1) { "" }
-                        ))
-                    }
-                    clientLoaded = true
+                    loadMachinesFromClient(client.machines)
                     if (contactName.isBlank()) contactName = client.name
                 }
             }
@@ -207,8 +221,8 @@ fun EditCallDialog(
                 Text("Risolto")
             }
 
-            // Machines/serials from client - visible green card
-            if (serials.isNotEmpty()) {
+            // Client machines - SELECTABLE with checkboxes
+            if (clientMachines.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -219,32 +233,66 @@ fun EditCallDialog(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            "Macchine del cliente",
+                            "Seleziona macchina/e",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = VNGreen
                         )
-                        Spacer(Modifier.height(6.dp))
-                        serials.forEach { entry ->
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Scegli quale macchina riguarda questa chiamata",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+
+                        clientMachines.forEachIndexed { idx, entry ->
+                            val isSelected = selectedIndices.contains(idx)
                             Row(
-                                modifier = Modifier.padding(vertical = 2.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    Icons.Default.Build, null,
-                                    Modifier.size(14.dp),
-                                    tint = VNGreen
-                                )
-                                Spacer(Modifier.width(6.dp))
-                                Text(
-                                    buildString {
-                                        append("SN: ${entry.number}")
-                                        if (entry.model.isNotBlank()) {
-                                            append(" \u2014 ${entry.model}")
+                                Checkbox(
+                                    checked = isSelected,
+                                    onCheckedChange = { checked ->
+                                        if (checked) {
+                                            if (!selectedIndices.contains(idx)) {
+                                                selectedIndices.add(idx)
+                                            }
+                                        } else {
+                                            selectedIndices.remove(idx)
                                         }
                                     },
-                                    style = MaterialTheme.typography.bodyMedium
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = VNGreen
+                                    )
                                 )
+                                Icon(
+                                    Icons.Default.Build, null,
+                                    Modifier.size(16.dp),
+                                    tint = if (isSelected) VNGreen
+                                           else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Column {
+                                    Text(
+                                        "SN: ${entry.number}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold
+                                                     else FontWeight.Normal,
+                                        color = if (isSelected) VNGreen
+                                                else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    if (entry.model.isNotBlank()) {
+                                        Text(
+                                            entry.model,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -265,7 +313,10 @@ fun EditCallDialog(
                 Spacer(Modifier.width(12.dp))
                 Button(
                     onClick = {
-                        val serialStr = serials
+                        // Only save SELECTED machines
+                        val serialStr = selectedIndices
+                            .sorted()
+                            .mapNotNull { idx -> clientMachines.getOrNull(idx) }
                             .filter { it.number.isNotBlank() }
                             .joinToString(",") { "${it.number}|${it.model}" }
                         val duration = if (note != null && note.durationSec > 0) {
@@ -308,15 +359,7 @@ fun EditCallDialog(
                 // Auto-lookup client machines
                 vm.findClientByPhone(contact.phone) { client ->
                     if (client != null && client.machines.isNotBlank()) {
-                        serials.clear()
-                        client.machines.split(",").forEach { s ->
-                            val parts = s.trim().split("|")
-                            serials.add(SerialEntry(
-                                parts.getOrElse(0) { "" },
-                                parts.getOrElse(1) { "" }
-                            ))
-                        }
-                        clientLoaded = true
+                        loadMachinesFromClient(client.machines)
                     }
                 }
                 showContactPicker = false
@@ -331,17 +374,7 @@ fun EditCallDialog(
             onSelect = { client ->
                 contactName = client.name
                 phone = client.phone
-                serials.clear()
-                if (client.machines.isNotBlank()) {
-                    client.machines.split(",").forEach { s ->
-                        val parts = s.trim().split("|")
-                        serials.add(SerialEntry(
-                            parts.getOrElse(0) { "" },
-                            parts.getOrElse(1) { "" }
-                        ))
-                    }
-                }
-                clientLoaded = true
+                loadMachinesFromClient(client.machines)
                 showClientPicker = false
             }
         )
