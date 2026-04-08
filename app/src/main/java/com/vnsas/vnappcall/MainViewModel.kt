@@ -156,10 +156,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _loading.value = true
             try {
-                val settings = _mailSettings.value
-                val dateStr = if (notes.isNotEmpty()) PortalSync.formatDate(notes.first().timestamp) else PortalSync.formatDate(System.currentTimeMillis())
+                // Re-read settings to pick up defaults for blank values
+                val settings = ctx.loadMailSettings()
+                _mailSettings.value = settings
+                if (notes.isEmpty()) {
+                    _snackbar.value = "Nessuna nota da sincronizzare"
+                    return@launch
+                }
+                val dateStr = PortalSync.formatDate(notes.first().timestamp)
                 val ok = PortalSync.uploadReport(settings.portalUrl, settings.apiKey, dateStr, notes)
-                _snackbar.value = if (ok) "Sincronizzato con il portale!" else "Errore sincronizzazione portale"
+                _snackbar.value = if (ok) "Sincronizzato con il portale!" else "Errore: controlla URL portale nelle impostazioni"
             } catch (e: Throwable) {
                 _snackbar.value = "Errore sync: ${e.message ?: "errore sconosciuto"}"
             } finally {
@@ -172,7 +178,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _loading.value = true
             try {
-                val settings = _mailSettings.value
+                // Re-read settings to pick up defaults for blank values
+                val settings = ctx.loadMailSettings()
+                _mailSettings.value = settings
                 val notes = dao.getBetween(fromMs, toMs)
                 if (notes.isEmpty()) {
                     _snackbar.value = "Nessuna nota da sincronizzare nel periodo"
