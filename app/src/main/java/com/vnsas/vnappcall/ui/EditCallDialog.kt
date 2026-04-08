@@ -7,15 +7,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -23,22 +27,22 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vnsas.vnappcall.MainViewModel
 import com.vnsas.vnappcall.data.CallNote
-import com.vnsas.vnappcall.data.ClientContact
 import com.vnsas.vnappcall.data.SerialEntry
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,7 +62,6 @@ fun EditCallDialog(
     var showContactPicker by remember { mutableStateOf(false) }
     var showClientPicker by remember { mutableStateOf(false) }
 
-    // Parse existing serials from the call note
     val serials = remember {
         val list = mutableStateListOf<SerialEntry>()
         if (note != null && note.serial.isNotBlank()) {
@@ -70,9 +73,17 @@ fun EditCallDialog(
         list
     }
 
+    val fieldShape = RoundedCornerShape(12.dp)
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+        focusedContainerColor = MaterialTheme.colorScheme.surface,
+        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+    )
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
@@ -83,49 +94,56 @@ fun EditCallDialog(
             Text(
                 text = if (note == null) "Nuova Chiamata" else "Modifica Chiamata",
                 style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // Client contact picker (loads machines automatically)
-            OutlinedButton(
-                onClick = { showClientPicker = true },
-                modifier = Modifier.fillMaxWidth()
+            // Two picker buttons: clients and rubrica
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.People, null)
-                Spacer(Modifier.width(8.dp))
-                Text(if (contactName.isBlank()) "Seleziona cliente" else "Cliente: $contactName")
+                OutlinedButton(
+                    onClick = { showClientPicker = true },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(Icons.Default.People, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (contactName.isBlank()) "Cliente" else contactName, maxLines = 1)
+                }
+                OutlinedButton(
+                    onClick = { showContactPicker = true },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Icon(Icons.Default.Contacts, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Rubrica", maxLines = 1)
+                }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
 
-            // Contact name (manual or from picker)
             OutlinedTextField(
-                value = contactName,
-                onValueChange = { contactName = it },
+                value = contactName, onValueChange = { contactName = it },
                 label = { Text("Nome contatto") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                shape = fieldShape, colors = fieldColors
             )
-
             Spacer(Modifier.height(8.dp))
-
             OutlinedTextField(
-                value = phone,
-                onValueChange = { phone = it },
+                value = phone, onValueChange = { phone = it },
                 label = { Text("Telefono") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                shape = fieldShape, colors = fieldColors
             )
-
             Spacer(Modifier.height(8.dp))
-
             OutlinedTextField(
-                value = noteText,
-                onValueChange = { noteText = it },
+                value = noteText, onValueChange = { noteText = it },
                 label = { Text("Note") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-                maxLines = 4
+                modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 4,
+                shape = fieldShape, colors = fieldColors
             )
 
             Spacer(Modifier.height(8.dp))
@@ -134,9 +152,15 @@ fun EditCallDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Checkbox(checked = billable, onCheckedChange = { billable = it })
+                Checkbox(
+                    checked = billable, onCheckedChange = { billable = it },
+                    colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                )
                 Text("Da fatturare", modifier = Modifier.padding(end = 16.dp))
-                Checkbox(checked = resolved, onCheckedChange = { resolved = it })
+                Checkbox(
+                    checked = resolved, onCheckedChange = { resolved = it },
+                    colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                )
                 Text("Risolto")
             }
 
@@ -145,6 +169,8 @@ fun EditCallDialog(
             Text(
                 "Seriali macchine",
                 style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = 4.dp)
             )
 
@@ -157,26 +183,26 @@ fun EditCallDialog(
                         value = entry.number,
                         onValueChange = { serials[idx] = entry.copy(number = it) },
                         label = { Text("Seriale") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
+                        modifier = Modifier.weight(1f), singleLine = true,
+                        shape = fieldShape, colors = fieldColors
                     )
                     Spacer(Modifier.width(8.dp))
                     OutlinedTextField(
                         value = entry.model,
                         onValueChange = { serials[idx] = entry.copy(model = it) },
                         label = { Text("Modello") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
+                        modifier = Modifier.weight(1f), singleLine = true,
+                        shape = fieldShape, colors = fieldColors
                     )
                     IconButton(onClick = { serials.removeAt(idx) }) {
-                        Icon(Icons.Default.Close, "Rimuovi")
+                        Icon(Icons.Default.Close, "Rimuovi", tint = MaterialTheme.colorScheme.error)
                     }
                 }
                 Spacer(Modifier.height(4.dp))
             }
 
             TextButton(onClick = { serials.add(SerialEntry()) }) {
-                Icon(Icons.Default.Add, null)
+                Icon(Icons.Default.Add, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
                 Text("Aggiungi seriale")
             }
@@ -187,39 +213,38 @@ fun EditCallDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                OutlinedButton(onClick = onDismiss) {
-                    Text("Annulla")
-                }
+                OutlinedButton(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(14.dp)
+                ) { Text("Annulla") }
                 Spacer(Modifier.width(12.dp))
-                Button(onClick = {
-                    val serialStr = serials
-                        .filter { it.number.isNotBlank() }
-                        .joinToString(",") { "${it.number}|${it.model}" }
-
-                    val duration = if (note?.durationSec != null && note.durationSec > 0) {
-                        note.durationSec
-                    } else if (phone.isNotBlank()) {
-                        vm.findCallDuration(phone, note?.timestamp ?: System.currentTimeMillis())
-                    } else 0
-
-                    onSave(
-                        CallNote(
-                            id = note?.id ?: 0,
-                            contactName = contactName,
-                            phone = phone,
-                            timestamp = note?.timestamp ?: System.currentTimeMillis(),
-                            note = noteText,
-                            billable = billable,
-                            resolved = resolved,
-                            serial = serialStr,
-                            durationSec = duration
+                Button(
+                    onClick = {
+                        val serialStr = serials
+                            .filter { it.number.isNotBlank() }
+                            .joinToString(",") { "${it.number}|${it.model}" }
+                        val duration = if (note?.durationSec != null && note.durationSec > 0) {
+                            note.durationSec
+                        } else if (phone.isNotBlank()) {
+                            vm.findCallDuration(phone, note?.timestamp ?: System.currentTimeMillis())
+                        } else 0
+                        onSave(
+                            CallNote(
+                                id = note?.id ?: 0,
+                                contactName = contactName,
+                                phone = phone,
+                                timestamp = note?.timestamp ?: System.currentTimeMillis(),
+                                note = noteText,
+                                billable = billable,
+                                resolved = resolved,
+                                serial = serialStr,
+                                durationSec = duration
+                            )
                         )
-                    )
-                }) {
-                    Text("Salva")
-                }
+                    },
+                    shape = RoundedCornerShape(14.dp)
+                ) { Text("Salva") }
             }
-
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -243,7 +268,6 @@ fun EditCallDialog(
             onSelect = { client ->
                 contactName = client.name
                 phone = client.phone
-                // Load machines from client contact
                 serials.clear()
                 if (client.machines.isNotBlank()) {
                     client.machines.split(",").forEach { s ->

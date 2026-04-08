@@ -7,13 +7,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -22,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -63,9 +66,17 @@ fun EditClientContactDialog(
         list
     }
 
+    val fieldShape = RoundedCornerShape(12.dp)
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+        focusedContainerColor = MaterialTheme.colorScheme.surface,
+        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+    )
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
@@ -80,34 +91,30 @@ fun EditClientContactDialog(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // Name + phone picker
+            // Name field with rubrica button
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
+                    value = name, onValueChange = { name = it },
                     label = { Text("Nome cliente") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
+                    modifier = Modifier.weight(1f), singleLine = true,
+                    shape = fieldShape, colors = fieldColors
                 )
-                IconButton(onClick = {
-                    vm.refreshContacts()
-                    showPhonePicker = true
-                }) {
-                    Icon(Icons.Default.People, "Da rubrica")
+                IconButton(onClick = { showPhonePicker = true }) {
+                    Icon(Icons.Default.Contacts, "Da rubrica", tint = MaterialTheme.colorScheme.primary)
                 }
             }
 
             Spacer(Modifier.height(8.dp))
 
             OutlinedTextField(
-                value = phone,
-                onValueChange = { phone = it },
+                value = phone, onValueChange = { phone = it },
                 label = { Text("Telefono") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                shape = fieldShape, colors = fieldColors
             )
 
             // Machines section
@@ -129,26 +136,26 @@ fun EditClientContactDialog(
                         value = entry.number,
                         onValueChange = { machines[idx] = entry.copy(number = it) },
                         label = { Text("Seriale") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
+                        modifier = Modifier.weight(1f), singleLine = true,
+                        shape = fieldShape, colors = fieldColors
                     )
                     Spacer(Modifier.width(8.dp))
                     OutlinedTextField(
                         value = entry.model,
                         onValueChange = { machines[idx] = entry.copy(model = it) },
                         label = { Text("Modello") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true
+                        modifier = Modifier.weight(1f), singleLine = true,
+                        shape = fieldShape, colors = fieldColors
                     )
                     IconButton(onClick = { machines.removeAt(idx) }) {
-                        Icon(Icons.Default.Close, "Rimuovi")
+                        Icon(Icons.Default.Close, "Rimuovi", tint = MaterialTheme.colorScheme.error)
                     }
                 }
                 Spacer(Modifier.height(4.dp))
             }
 
             TextButton(onClick = { machines.add(SerialEntry()) }) {
-                Icon(Icons.Default.Add, null)
+                Icon(Icons.Default.Add, null, Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
                 Text("Aggiungi macchina")
             }
@@ -159,9 +166,10 @@ fun EditClientContactDialog(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                OutlinedButton(onClick = onDismiss) {
-                    Text("Annulla")
-                }
+                OutlinedButton(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(14.dp)
+                ) { Text("Annulla") }
                 Spacer(Modifier.width(12.dp))
                 Button(
                     onClick = {
@@ -177,12 +185,10 @@ fun EditClientContactDialog(
                             )
                         )
                     },
-                    enabled = name.isNotBlank()
-                ) {
-                    Text("Salva")
-                }
+                    enabled = name.isNotBlank(),
+                    shape = RoundedCornerShape(14.dp)
+                ) { Text("Salva") }
             }
-
             Spacer(Modifier.height(24.dp))
         }
     }

@@ -8,21 +8,25 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Divider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -39,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import com.vnsas.vnappcall.MainViewModel
 import com.vnsas.vnappcall.worker.DailyReportReceiver
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsTab(vm: MainViewModel) {
     val settings by vm.mailSettings.collectAsState()
@@ -75,27 +78,34 @@ fun SettingsTab(vm: MainViewModel) {
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("Impostazioni") })
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // SMTP Section
-            SectionTitle("Server Email (SMTP)")
+    val fieldShape = RoundedCornerShape(12.dp)
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+        focusedContainerColor = MaterialTheme.colorScheme.surface,
+        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+    )
 
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Impostazioni",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        // SMTP Section
+        SettingsSection("Server Email (SMTP)") {
             OutlinedTextField(
                 value = host, onValueChange = { host = it },
                 label = { Text("Host SMTP") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                shape = fieldShape, colors = fieldColors
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -107,64 +117,62 @@ fun SettingsTab(vm: MainViewModel) {
                     label = { Text("Porta") },
                     modifier = Modifier.weight(1f),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true
+                    singleLine = true, shape = fieldShape, colors = fieldColors
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("SSL")
-                    Spacer(Modifier.padding(start = 4.dp))
-                    Switch(checked = ssl, onCheckedChange = { ssl = it })
+                    Text("SSL", style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.width(4.dp))
+                    Switch(
+                        checked = ssl, onCheckedChange = { ssl = it },
+                        colors = SwitchDefaults.colors(checkedTrackColor = MaterialTheme.colorScheme.primary)
+                    )
                 }
             }
             OutlinedTextField(
                 value = user, onValueChange = { user = it },
                 label = { Text("Username") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                shape = fieldShape, colors = fieldColors
             )
             OutlinedTextField(
                 value = pass, onValueChange = { pass = it },
                 label = { Text("Password") },
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation = PasswordVisualTransformation(),
-                singleLine = true
+                singleLine = true, shape = fieldShape, colors = fieldColors
             )
             OutlinedTextField(
                 value = from, onValueChange = { from = it },
                 label = { Text("Mittente (email)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                shape = fieldShape, colors = fieldColors
             )
             OutlinedTextField(
                 value = to, onValueChange = { to = it },
                 label = { Text("Destinatario (email)") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                shape = fieldShape, colors = fieldColors
             )
-
             OutlinedButton(
-                onClick = {
-                    save()
-                    vm.sendTestEmail()
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Invia email di test")
-            }
+                onClick = { save(); vm.sendTestEmail() },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp)
+            ) { Text("Invia email di test") }
+        }
 
-            Divider(modifier = Modifier.padding(vertical = 4.dp))
-
-            // Auto report
-            SectionTitle("Report Automatico")
-
+        // Auto report
+        SettingsSection("Report Automatico") {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Invio automatico giornaliero")
-                Switch(checked = autoEnabled, onCheckedChange = { autoEnabled = it })
+                Text("Invio automatico giornaliero", style = MaterialTheme.typography.bodyMedium)
+                Switch(
+                    checked = autoEnabled, onCheckedChange = { autoEnabled = it },
+                    colors = SwitchDefaults.colors(checkedTrackColor = MaterialTheme.colorScheme.primary)
+                )
             }
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -174,56 +182,71 @@ fun SettingsTab(vm: MainViewModel) {
                     label = { Text("Ora") },
                     modifier = Modifier.weight(1f),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true
+                    singleLine = true, shape = fieldShape, colors = fieldColors
                 )
                 OutlinedTextField(
                     value = autoMinute, onValueChange = { autoMinute = it },
                     label = { Text("Minuto") },
                     modifier = Modifier.weight(1f),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true
+                    singleLine = true, shape = fieldShape, colors = fieldColors
                 )
             }
+        }
 
-            Divider(modifier = Modifier.padding(vertical = 4.dp))
-
-            // Portal
-            SectionTitle("Portale Web")
-
+        // Portal
+        SettingsSection("Portale Web") {
             OutlinedTextField(
                 value = portalUrl, onValueChange = { portalUrl = it },
                 label = { Text("URL Portale") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                shape = fieldShape, colors = fieldColors
             )
             OutlinedTextField(
                 value = apiKey, onValueChange = { apiKey = it },
                 label = { Text("API Key") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                shape = fieldShape, colors = fieldColors
             )
-
-            Spacer(Modifier.height(8.dp))
-
-            Button(
-                onClick = { save() },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Salva impostazioni")
-            }
-
-            Spacer(Modifier.height(32.dp))
         }
+
+        // Save button
+        Spacer(Modifier.height(4.dp))
+        Button(
+            onClick = { save() },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Icon(Icons.Default.Save, null)
+            Spacer(Modifier.width(8.dp))
+            Text("Salva impostazioni")
+        }
+        Spacer(Modifier.height(32.dp))
     }
 }
 
 @Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 8.dp)
-    )
+private fun SettingsSection(
+    title: String,
+    content: @Composable () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            content()
+        }
+    }
 }
