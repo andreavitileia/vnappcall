@@ -1,6 +1,7 @@
 package com.vnsas.vnappcall
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vnsas.vnappcall.data.CallNote
@@ -159,14 +160,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // Re-read settings to pick up defaults for blank values
                 val settings = ctx.loadMailSettings()
                 _mailSettings.value = settings
+                Log.d("MainViewModel", "syncToPortal: portalUrl='${settings.portalUrl}' apiKey='${settings.apiKey}' notes=${notes.size}")
                 if (notes.isEmpty()) {
                     _snackbar.value = "Nessuna nota da sincronizzare"
                     return@launch
                 }
                 val dateStr = PortalSync.formatDate(notes.first().timestamp)
+                Log.d("MainViewModel", "syncToPortal: dateStr=$dateStr")
                 val ok = PortalSync.uploadReport(settings.portalUrl, settings.apiKey, dateStr, notes)
+                Log.d("MainViewModel", "syncToPortal: result=$ok")
                 _snackbar.value = if (ok) "Sincronizzato con il portale!" else "Errore: controlla URL portale nelle impostazioni"
             } catch (e: Throwable) {
+                Log.e("MainViewModel", "syncToPortal failed", e)
                 _snackbar.value = "Errore sync: ${e.message ?: "errore sconosciuto"}"
             } finally {
                 _loading.value = false
@@ -181,15 +186,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // Re-read settings to pick up defaults for blank values
                 val settings = ctx.loadMailSettings()
                 _mailSettings.value = settings
+                Log.d("MainViewModel", "bulkSync: portalUrl='${settings.portalUrl}' apiKey='${settings.apiKey}'")
                 val notes = dao.getBetween(fromMs, toMs)
+                Log.d("MainViewModel", "bulkSync: found ${notes.size} notes from $fromMs to $toMs")
                 if (notes.isEmpty()) {
                     _snackbar.value = "Nessuna nota da sincronizzare nel periodo"
                 } else {
                     val byDate = notes.groupBy { PortalSync.formatDate(it.timestamp) }
-                    val count = PortalSync.bulkSync(settings.portalUrl, settings.apiKey, byDate) { _, _ -> }
+                    val count = PortalSync.bulkSync(settings.portalUrl, settings.apiKey, byDate) { cur, total ->
+                        Log.d("MainViewModel", "bulkSync progress: $cur/$total")
+                    }
                     _snackbar.value = "Sync completato: $count/${byDate.size} giorni inviati"
                 }
             } catch (e: Throwable) {
+                Log.e("MainViewModel", "bulkSync failed", e)
                 _snackbar.value = "Errore sync: ${e.message ?: "errore sconosciuto"}"
             } finally {
                 _loading.value = false

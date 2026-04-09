@@ -1,5 +1,6 @@
 package com.vnsas.vnappcall.util
 
+import android.util.Log
 import com.vnsas.vnappcall.data.CallNote
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,28 +15,36 @@ import java.util.Locale
 
 object PortalSync {
 
+    private const val TAG = "PortalSync"
+
     suspend fun uploadReport(
         portalUrl: String,
         apiKey: String,
         dateStr: String,
         items: List<CallNote>
     ): Boolean = withContext(Dispatchers.IO) {
-        if (portalUrl.isBlank() || apiKey.isBlank()) return@withContext false
-        if (!portalUrl.startsWith("http")) return@withContext false
+        Log.d(TAG, "uploadReport: url=$portalUrl, date=$dateStr, items=${items.size}")
+        if (portalUrl.isBlank() || apiKey.isBlank()) {
+            Log.e(TAG, "uploadReport: portalUrl or apiKey is blank! url='$portalUrl' key='$apiKey'")
+            return@withContext false
+        }
+        if (!portalUrl.startsWith("http")) {
+            Log.e(TAG, "uploadReport: portalUrl doesn't start with http: '$portalUrl'")
+            return@withContext false
+        }
 
         try {
             val dfTime = SimpleDateFormat("HH:mm", Locale.getDefault())
             val rows = JSONArray()
             for (item in items) {
-                val machines = JSONArray()
+                // Server expects "serials" as TEXT[] (array of strings like "SN123|ModelX")
+                val serialsArray = JSONArray()
                 if (item.serial.isNotBlank()) {
                     item.serial.split(",").forEach { s ->
-                        val parts = s.trim().split("|")
-                        val machine = JSONObject().apply {
-                            put("serial", parts.getOrElse(0) { "" })
-                            put("model", parts.getOrElse(1) { "" })
+                        val trimmed = s.trim()
+                        if (trimmed.isNotBlank()) {
+                            serialsArray.put(trimmed)
                         }
-                        machines.put(machine)
                     }
                 }
 
@@ -51,20 +60,20 @@ object PortalSync {
                     put("note", item.note)
                     put("billable", item.billable)
                     put("resolved", item.resolved)
-                    put("machines", machines)
+                    put("serials", serialsArray)
                 }
                 rows.put(row)
             }
 
             val payload = JSONObject().apply {
                 put("date", dateStr)
-                put("totalCalls", items.size)
-                put("billableCount", items.count { it.billable })
-                put("resolvedCount", items.count { it.resolved })
                 put("rows", rows)
             }
 
-            val url = URL("${portalUrl.trimEnd('/')}/api/reports")
+            val fullUrl = "${portalUrl.trimEnd('/')}/api/reports"
+            Log.d(TAG, "POST $fullUrl payload=${payload.toString().take(500)}")
+
+            val url = URL(fullUrl)
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 setRequestProperty("Content-Type", "application/json; charset=UTF-8")
@@ -79,9 +88,16 @@ object PortalSync {
             }
 
             val code = conn.responseCode
+            val body = try {
+                if (code in 200..299) conn.inputStream.bufferedReader().readText()
+                else conn.errorStream?.bufferedReader()?.readText() ?: "no body"
+            } catch (_: Throwable) { "read error" }
             conn.disconnect()
+
+            Log.d(TAG, "Response: code=$code body=$body")
             code in 200..299
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.e(TAG, "uploadReport failed", e)
             false
         }
     }
