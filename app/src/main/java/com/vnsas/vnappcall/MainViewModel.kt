@@ -18,6 +18,7 @@ import com.vnsas.vnappcall.util.MailSender
 import com.vnsas.vnappcall.util.PhoneContact
 import com.vnsas.vnappcall.util.PortalSync
 import com.vnsas.vnappcall.util.ReportExporter
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -67,8 +68,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Automatically sync all notes for a given date to the portal.
+     * Automatically sync all calls for a given date to the portal.
      * Called after every save/update/delete for real-time sync.
+     * Sends ALL calls from phone log merged with annotations.
      */
     private suspend fun autoSyncDate(timestamp: Long) {
         try {
@@ -76,7 +78,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (settings.portalUrl.isBlank() || settings.apiKey.isBlank()) return
 
             val dateStr = PortalSync.formatDate(timestamp)
-            // Get the day boundaries for this timestamp
             val cal = Calendar.getInstance().apply {
                 timeInMillis = timestamp
                 set(Calendar.HOUR_OF_DAY, 0)
@@ -88,16 +89,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             cal.add(Calendar.DAY_OF_YEAR, 1)
             val dayEnd = cal.timeInMillis
 
+            // Get ALL calls from phone log for this date
+            val dayCalls = CallLogReader.loadInDateRange(ctx, dayStart, dayEnd)
+            // Get annotations from DB
             val dayNotes = dao.getBetween(dayStart, dayEnd)
-            Log.d("MainViewModel", "autoSync: date=$dateStr, notes=${dayNotes.size}")
+            Log.d("MainViewModel", "autoSync: date=$dateStr, calls=${dayCalls.size}, notes=${dayNotes.size}")
 
-            if (dayNotes.isEmpty()) {
+            if (dayCalls.isEmpty() && dayNotes.isEmpty()) {
                 // Send empty report to clear the date on the portal
                 PortalSync.uploadReport(settings.portalUrl, settings.apiKey, dateStr, emptyList())
+            } else if (dayCalls.isNotEmpty()) {
+                // Upload all calls merged with annotations
+                val ok = PortalSync.uploadAllCalls(
+                    settings.portalUrl, settings.apiKey, dateStr,
+                    dayCalls, dayNotes
+                )
+                if (ok) {
+                    Log.d("MainViewModel", "autoSync OK: $dateStr (${dayCalls.size} calls, ${dayNotes.size} annotations)")
+                } else {
+                    Log.e("MainViewModel", "autoSync FAILED: $dateStr")
+                }
             } else {
+                // Only annotations, no call log entries (edge case)
                 val ok = PortalSync.uploadReport(settings.portalUrl, settings.apiKey, dateStr, dayNotes)
                 if (ok) {
-                    Log.d("MainViewModel", "autoSync OK: $dateStr (${dayNotes.size} notes)")
+                    Log.d("MainViewModel", "autoSync OK: $dateStr (${dayNotes.size} annotations only)")
                 } else {
                     Log.e("MainViewModel", "autoSync FAILED: $dateStr")
                 }
@@ -111,9 +127,124 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _callLog = MutableStateFlow<List<CallLogEntry>>(emptyList())
     val callLog: StateFlow<List<CallLogEntry>> = _callLog.asStateFlow()
 
+    // Track if initial auto-sync has been done
+    private var initialSyncDone = false
+
     fun refreshCallLog() {
         viewModelScope.launch {
             _callLog.value = CallLogReader.loadRecent(ctx, 100)
+            // Auto-sync all calls to portal whenever call log is refreshed
+            if (!initialSyncDone) {
+                initialSyncDone = true
+                syncAllCallsToPortal()
+                // Start periodic sync every 5 minutes
+                startPeriodicSync()
+            }
+        }
+    }
+
+    /**
+     * Sync ALL calls from the phone log (merged with annotations) to the portal.
+     * This ensures all calls appear on the portal, not just annotated ones.
+     */
+    fun syncAllCallsToPortal() {
+        viewModelScope.launch {
+            try {
+                val settings = ctx.loadMailSettings()
+                if (settings.portalUrl.isBlank() || settings.apiKey.isBlank()) {
+                    Log.d("MainViewModel", "syncAllCalls: skipped (no portal settings)")
+                    return@launch
+                }
+
+                // Get today's boundaries
+                val cal = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+                val dayStart = cal.timeInMillis
+                cal.add(Calendar.DAY_OF_YEAR, 1)
+                val dayEnd = cal.timeInMillis
+                val dateStr = PortalSync.formatDate(dayStart)
+
+                // Get today's calls from phone log
+                val todayCalls = CallLogReader.loadInDateRange(ctx, dayStart, dayEnd)
+                Log.d("MainViewModel", "syncAllCalls: ${todayCalls.size} calls from phone log for $dateStr")
+
+                if (todayCalls.isEmpty()) {
+                    Log.d("MainViewModel", "syncAllCalls: no calls today, skipping")
+                    return@launch
+                }
+
+                // Get today's annotations from DB
+                val todayAnnotations = dao.getBetween(dayStart, dayEnd)
+                Log.d("MainViewModel", "syncAllCalls: ${todayAnnotations.size} annotations in DB")
+
+                // Upload all calls merged with annotations
+                val ok = PortalSync.uploadAllCalls(
+                    settings.portalUrl, settings.apiKey, dateStr,
+                    todayCalls, todayAnnotations
+                )
+                if (ok) {
+                    Log.d("MainViewModel", "syncAllCalls OK: $dateStr (${todayCalls.size} calls)")
+                } else {
+                    Log.e("MainViewModel", "syncAllCalls FAILED: $dateStr")
+                }
+            } catch (e: Throwable) {
+                Log.e("MainViewModel", "syncAllCalls error", e)
+            }
+        }
+    }
+
+    /**
+     * Start periodic sync every 5 minutes to keep portal up-to-date.
+     */
+    private fun startPeriodicSync() {
+        viewModelScope.launch {
+            while (true) {
+                delay(5 * 60 * 1000L) // 5 minutes
+                try {
+                    // Refresh call log first
+                    _callLog.value = CallLogReader.loadRecent(ctx, 100)
+                    // Then sync all calls
+                    syncAllCallsToPortalSilent()
+                } catch (e: Throwable) {
+                    Log.e("MainViewModel", "periodicSync error", e)
+                }
+            }
+        }
+    }
+
+    /**
+     * Silent version of syncAllCallsToPortal (no UI feedback, for background sync).
+     */
+    private suspend fun syncAllCallsToPortalSilent() {
+        try {
+            val settings = ctx.loadMailSettings()
+            if (settings.portalUrl.isBlank() || settings.apiKey.isBlank()) return
+
+            val cal = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val dayStart = cal.timeInMillis
+            cal.add(Calendar.DAY_OF_YEAR, 1)
+            val dayEnd = cal.timeInMillis
+            val dateStr = PortalSync.formatDate(dayStart)
+
+            val todayCalls = CallLogReader.loadInDateRange(ctx, dayStart, dayEnd)
+            if (todayCalls.isEmpty()) return
+
+            val todayAnnotations = dao.getBetween(dayStart, dayEnd)
+            PortalSync.uploadAllCalls(
+                settings.portalUrl, settings.apiKey, dateStr,
+                todayCalls, todayAnnotations
+            )
+        } catch (e: Throwable) {
+            Log.e("MainViewModel", "syncAllCallsSilent error", e)
         }
     }
 
