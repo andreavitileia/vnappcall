@@ -51,11 +51,60 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun upsertNote(note: CallNote) {
-        viewModelScope.launch { dao.upsert(note) }
+        viewModelScope.launch {
+            dao.upsert(note)
+            // Auto-sync to portal in real-time
+            autoSyncDate(note.timestamp)
+        }
     }
 
     fun deleteNote(note: CallNote) {
-        viewModelScope.launch { dao.delete(note) }
+        viewModelScope.launch {
+            dao.delete(note)
+            // Auto-sync to portal after deletion
+            autoSyncDate(note.timestamp)
+        }
+    }
+
+    /**
+     * Automatically sync all notes for a given date to the portal.
+     * Called after every save/update/delete for real-time sync.
+     */
+    private suspend fun autoSyncDate(timestamp: Long) {
+        try {
+            val settings = ctx.loadMailSettings()
+            if (settings.portalUrl.isBlank() || settings.apiKey.isBlank()) return
+
+            val dateStr = PortalSync.formatDate(timestamp)
+            // Get the day boundaries for this timestamp
+            val cal = Calendar.getInstance().apply {
+                timeInMillis = timestamp
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val dayStart = cal.timeInMillis
+            cal.add(Calendar.DAY_OF_YEAR, 1)
+            val dayEnd = cal.timeInMillis
+
+            val dayNotes = dao.getBetween(dayStart, dayEnd)
+            Log.d("MainViewModel", "autoSync: date=$dateStr, notes=${dayNotes.size}")
+
+            if (dayNotes.isEmpty()) {
+                // Send empty report to clear the date on the portal
+                PortalSync.uploadReport(settings.portalUrl, settings.apiKey, dateStr, emptyList())
+            } else {
+                val ok = PortalSync.uploadReport(settings.portalUrl, settings.apiKey, dateStr, dayNotes)
+                if (ok) {
+                    Log.d("MainViewModel", "autoSync OK: $dateStr (${dayNotes.size} notes)")
+                } else {
+                    Log.e("MainViewModel", "autoSync FAILED: $dateStr")
+                }
+            }
+        } catch (e: Throwable) {
+            Log.e("MainViewModel", "autoSync error", e)
+        }
     }
 
     // --- Call log ---
