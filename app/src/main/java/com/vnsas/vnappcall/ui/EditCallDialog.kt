@@ -84,14 +84,19 @@ fun EditCallDialog(
         clientMachines.clear()
         selectedIndices.clear()
         if (machinesStr.isNotBlank()) {
-            machinesStr.split(",").forEachIndexed { idx, s ->
-                val parts = s.trim().split("|")
-                val entry = SerialEntry(parts.getOrElse(0) { "" }, parts.getOrElse(1) { "" })
+            val parts = machinesStr.split(",")
+            parts.forEachIndexed { idx, s ->
+                val fields = s.trim().split("|")
+                val entry = SerialEntry(fields.getOrElse(0) { "" }, fields.getOrElse(1) { "" })
                 clientMachines.add(entry)
                 // Pre-select if this machine was saved in the note
                 if (existingSerials.any { it.number == entry.number }) {
                     selectedIndices.add(idx)
                 }
+            }
+            // Auto-select if client has only ONE machine and nothing was pre-selected
+            if (parts.size == 1 && selectedIndices.isEmpty()) {
+                selectedIndices.add(0)
             }
         }
         clientLoaded = true
@@ -278,7 +283,7 @@ fun EditCallDialog(
                                 Spacer(Modifier.width(6.dp))
                                 Column {
                                     Text(
-                                        "SN: ${entry.number}",
+                                        "SN: " + entry.number,
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = if (isSelected) FontWeight.Bold
                                                      else FontWeight.Normal,
@@ -318,7 +323,7 @@ fun EditCallDialog(
                             .sorted()
                             .mapNotNull { idx -> clientMachines.getOrNull(idx) }
                             .filter { it.number.isNotBlank() }
-                            .joinToString(",") { "${it.number}|${it.model}" }
+                            .joinToString(",") { it.number + "|" + it.model }
                         val duration = if (note != null && note.durationSec > 0) {
                             note.durationSec
                         } else if (phone.isNotBlank()) {

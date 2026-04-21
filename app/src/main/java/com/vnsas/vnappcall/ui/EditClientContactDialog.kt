@@ -1,6 +1,7 @@
 package com.vnsas.vnappcall.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,11 +15,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,6 +47,8 @@ import com.vnsas.vnappcall.MainViewModel
 import com.vnsas.vnappcall.data.ClientContact
 import com.vnsas.vnappcall.data.SerialEntry
 import com.vnsas.vnappcall.ui.theme.VNGreen
+
+val MACHINE_TYPES = listOf("SM225", "EUROSPEEDY", "SMM", "SM3000", "SM7000", "SMONE")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -126,7 +132,7 @@ fun EditClientContactDialog(
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Aggiungi le macchine del cliente con numero seriale e modello",
+                        "Seleziona il tipo di macchina dal menu e inserisci il seriale",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -134,44 +140,102 @@ fun EditClientContactDialog(
                     Spacer(Modifier.height(12.dp))
 
                     machines.forEachIndexed { idx, entry ->
-                        Row(
+                        var modelExpanded by remember { mutableStateOf(false) }
+
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(bottom = 10.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
-                            OutlinedTextField(
-                                value = entry.number,
-                                onValueChange = { newVal ->
-                                    machines[idx] = entry.copy(number = newVal)
-                                },
-                                label = { Text("Seriale") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                shape = fieldShape,
-                                colors = fieldColors
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            OutlinedTextField(
-                                value = entry.model,
-                                onValueChange = { newVal ->
-                                    machines[idx] = entry.copy(model = newVal)
-                                },
-                                label = { Text("Modello") },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                shape = fieldShape,
-                                colors = fieldColors
-                            )
-                            IconButton(onClick = { machines.removeAt(idx) }) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    "Rimuovi",
-                                    tint = MaterialTheme.colorScheme.error
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        "Macchina " + (idx + 1).toString(),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = VNGreen,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    IconButton(
+                                        onClick = { machines.removeAt(idx) },
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            "Rimuovi",
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.height(8.dp))
+
+                                // Dropdown for machine type
+                                Box {
+                                    OutlinedTextField(
+                                        value = entry.model,
+                                        onValueChange = { newVal ->
+                                            machines[idx] = entry.copy(model = newVal)
+                                        },
+                                        label = { Text("Tipo macchina") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        shape = fieldShape,
+                                        colors = fieldColors,
+                                        trailingIcon = {
+                                            IconButton(onClick = { modelExpanded = !modelExpanded }) {
+                                                Icon(Icons.Default.ArrowDropDown, "Seleziona tipo")
+                                            }
+                                        }
+                                    )
+                                    DropdownMenu(
+                                        expanded = modelExpanded,
+                                        onDismissRequest = { modelExpanded = false }
+                                    ) {
+                                        MACHINE_TYPES.forEach { machineType ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        machineType,
+                                                        fontWeight = FontWeight.Medium
+                                                    )
+                                                },
+                                                onClick = {
+                                                    machines[idx] = entry.copy(model = machineType)
+                                                    modelExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Spacer(Modifier.height(10.dp))
+
+                                // Serial number field
+                                OutlinedTextField(
+                                    value = entry.number,
+                                    onValueChange = { newVal ->
+                                        machines[idx] = entry.copy(number = newVal)
+                                    },
+                                    label = { Text("Numero seriale (SN)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    shape = fieldShape,
+                                    colors = fieldColors
                                 )
                             }
                         }
                     }
+
+                    Spacer(Modifier.height(4.dp))
 
                     Button(
                         onClick = { machines.add(SerialEntry()) },
@@ -193,18 +257,18 @@ fun EditClientContactDialog(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedButton(
                     onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(14.dp)
                 ) { Text("Annulla") }
-                Spacer(Modifier.width(12.dp))
                 Button(
                     onClick = {
                         val machinesStr = machines
                             .filter { it.number.isNotBlank() || it.model.isNotBlank() }
-                            .joinToString(",") { "${'$'}{it.number}|${'$'}{it.model}" }
+                            .joinToString(",") { it.number + "|" + it.model }
                         onSave(
                             ClientContact(
                                 id = contact?.id ?: 0,
@@ -214,6 +278,7 @@ fun EditClientContactDialog(
                             )
                         )
                     },
+                    modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(14.dp)
                 ) { Text("Salva") }
             }

@@ -120,7 +120,7 @@ fun CallsTab(vm: MainViewModel) {
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "${'$'}{callLog.size} chiamate recenti",
+                    callLog.size.toString() + " chiamate recenti",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -426,7 +426,7 @@ private fun CallLogCard(
                         Spacer(Modifier.height(6.dp))
                         if (note.note.isNotBlank()) {
                             Text(
-                                "Nota: ${'$'}{note.note}",
+                                "Nota: " + note.note,
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
@@ -436,7 +436,7 @@ private fun CallLogCard(
                                 val parts = s.trim().split("|")
                                 val sn = parts.getOrElse(0) { "" }
                                 val model = parts.getOrElse(1) { "" }
-                                if (model.isNotBlank()) "${'$'}model (SN: ${'$'}sn)" else "SN: ${'$'}sn"
+                                if (model.isNotBlank()) model + " (SN: " + sn + ")" else "SN: " + sn
                             }
                             Column(modifier = Modifier.padding(bottom = 4.dp)) {
                                 Text(
@@ -447,7 +447,7 @@ private fun CallLogCard(
                                 )
                                 machinesList.forEach { machine ->
                                     Text(
-                                        "  \u2022 ${'$'}machine",
+                                        "  \u2022 $machine",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )

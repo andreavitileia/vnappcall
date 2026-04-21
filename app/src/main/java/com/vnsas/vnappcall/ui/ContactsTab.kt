@@ -154,7 +154,7 @@ fun ContactsTab(vm: MainViewModel) {
                 Spacer(Modifier.height(4.dp))
                 val withMachines = mergedContacts.count { it.machineCount > 0 }
                 Text(
-                    "${'$'}{mergedContacts.size} contatti \u2022 ${'$'}withMachines con macchine",
+                    "${mergedContacts.size} contatti \u2022 $withMachines con macchine",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -199,7 +199,7 @@ fun ContactsTab(vm: MainViewModel) {
                         Text(
                             if (phoneContacts.isEmpty())
                                 "Nessun contatto trovato"
-                            else "Nessun risultato per \"${'$'}query\"",
+                            else "Nessun risultato per \"" + query + "\"",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -336,7 +336,7 @@ private fun MergedContactCard(
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            "${'$'}{machines.size} macch.",
+                            machines.size.toString() + " macch.",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = VNGreen
@@ -368,8 +368,8 @@ private fun MergedContactCard(
                                 Spacer(Modifier.width(6.dp))
                                 Text(
                                     buildString {
-                                        append("SN: ${'$'}{m.number}")
-                                        if (m.model.isNotBlank()) append(" \u2014 ${'$'}{m.model}")
+                                        append("SN: " + m.number)
+                                        if (m.model.isNotBlank()) append(" \u2014 ${m.model}")
                                     },
                                     style = MaterialTheme.typography.bodyMedium
                                 )
