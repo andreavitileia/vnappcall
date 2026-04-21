@@ -1,6 +1,8 @@
 package com.vnsas.vnappcall.ui
 
+import android.content.Intent
 import android.provider.CallLog
+import android.provider.ContactsContract
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,8 +30,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.PhoneMissed
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -40,6 +42,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -53,7 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -72,12 +75,11 @@ import java.util.Locale
 fun CallsTab(vm: MainViewModel) {
     val callLog by vm.callLog.collectAsState()
     val allNotes by vm.allNotes.collectAsState()
-    var filter by remember { mutableIntStateOf(0) } // 0=all, 1=incoming, 2=outgoing, 3=missed
+    var filter by remember { mutableIntStateOf(0) }
     var showDialog by remember { mutableStateOf(false) }
     var editNote by remember { mutableStateOf<CallNote?>(null) }
     var prefilledEntry by remember { mutableStateOf<CallLogEntry?>(null) }
 
-    // Auto-refresh call log when tab opens
     LaunchedEffect(Unit) {
         vm.refreshCallLog()
     }
@@ -117,14 +119,13 @@ fun CallsTab(vm: MainViewModel) {
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "${callLog.size} chiamate recenti",
+                    "${'$'}{callLog.size} chiamate recenti",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(8.dp))
             }
 
-            // Summary cards
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -148,7 +149,6 @@ fun CallsTab(vm: MainViewModel) {
                 }
             }
 
-            // Filter chips
             item {
                 Spacer(Modifier.height(4.dp))
                 Row(
@@ -198,14 +198,15 @@ fun CallsTab(vm: MainViewModel) {
             }
 
             items(filtered) { entry ->
-                // Check if there's an existing note for this call
                 val existingNote = allNotes.find { n ->
                     n.phone.takeLast(7) == (entry.number ?: "").takeLast(7) &&
                     kotlin.math.abs(n.timestamp - entry.date) < 5 * 60 * 1000L
                 }
+                val isUnknown = entry.name == null || entry.name.isBlank()
                 CallLogCard(
                     entry = entry,
                     note = existingNote,
+                    isUnknown = isUnknown,
                     onAnnotate = {
                         prefilledEntry = entry
                         editNote = existingNote
@@ -217,7 +218,6 @@ fun CallsTab(vm: MainViewModel) {
             item { Spacer(Modifier.height(80.dp)) }
         }
 
-        // FAB to add manual note
         FloatingActionButton(
             onClick = { prefilledEntry = null; editNote = null; showDialog = true },
             modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
@@ -270,11 +270,13 @@ private fun SummaryCard(title: String, value: String, color: Color, modifier: Mo
 private fun CallLogCard(
     entry: CallLogEntry,
     note: CallNote?,
+    isUnknown: Boolean,
     onAnnotate: () -> Unit,
     onDeleteNote: () -> Unit
 ) {
     val df = remember { SimpleDateFormat("dd/MM HH:mm", Locale.ITALIAN) }
     var expanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     val (icon, iconColor) = when (entry.type) {
         CallLog.Calls.INCOMING_TYPE -> Icons.Default.CallReceived to VNGreen
@@ -298,7 +300,6 @@ private fun CallLogCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Avatar with call type icon
                 Box(
                     modifier = Modifier.size(40.dp).clip(CircleShape)
                         .background(iconColor.copy(alpha = 0.15f)),
@@ -336,7 +337,6 @@ private fun CallLogCard(
                     }
                 }
 
-                // Annotation indicator - clear text badges
                 if (note != null) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -394,11 +394,30 @@ private fun CallLogCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+
+                    if (isUnknown && entry.number != null) {
+                        Spacer(Modifier.height(6.dp))
+                        OutlinedButton(
+                            onClick = {
+                                val intent = Intent(ContactsContract.Intents.Insert.ACTION).apply {
+                                    type = ContactsContract.RawContacts.CONTENT_TYPE
+                                    putExtra(ContactsContract.Intents.Insert.PHONE, entry.number)
+                                }
+                                context.startActivity(intent)
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.PersonAdd, null, Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Aggiungi a rubrica")
+                        }
+                    }
+
                     if (note != null) {
                         Spacer(Modifier.height(6.dp))
                         if (note.note.isNotBlank()) {
                             Text(
-                                "Nota: ${note.note}",
+                                "Nota: ${'$'}{note.note}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
@@ -408,7 +427,7 @@ private fun CallLogCard(
                                 val parts = s.trim().split("|")
                                 val sn = parts.getOrElse(0) { "" }
                                 val model = parts.getOrElse(1) { "" }
-                                if (model.isNotBlank()) "$model (SN: $sn)" else "SN: $sn"
+                                if (model.isNotBlank()) "${'$'}model (SN: ${'$'}sn)" else "SN: ${'$'}sn"
                             }
                             Column(modifier = Modifier.padding(bottom = 4.dp)) {
                                 Text(
@@ -419,7 +438,7 @@ private fun CallLogCard(
                                 )
                                 machinesList.forEach { machine ->
                                     Text(
-                                        "  \u2022 $machine",
+                                        "  \u2022 ${'$'}machine",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -474,16 +493,5 @@ private fun CallLogCard(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun StatusBadge(icon: ImageVector, color: Color) {
-    Box(
-        modifier = Modifier.size(24.dp).clip(CircleShape)
-            .background(color.copy(alpha = 0.15f)),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(icon, null, Modifier.size(14.dp), tint = color)
     }
 }

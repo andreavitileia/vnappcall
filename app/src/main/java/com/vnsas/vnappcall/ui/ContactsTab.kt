@@ -26,14 +26,10 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,6 +54,13 @@ import com.vnsas.vnappcall.data.SerialEntry
 import com.vnsas.vnappcall.ui.theme.VNGreen
 import com.vnsas.vnappcall.util.PhoneContact
 
+private data class MergedContact(
+    val name: String,
+    val phone: String,
+    val clientContact: ClientContact?,
+    val machineCount: Int
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContactsTab(vm: MainViewModel) {
@@ -66,26 +69,59 @@ fun ContactsTab(vm: MainViewModel) {
     var query by remember { mutableStateOf("") }
     var showDialog by remember { mutableStateOf(false) }
     var editContact by remember { mutableStateOf<ClientContact?>(null) }
-    var showRubrica by remember { mutableStateOf(false) }
+    var editPhoneContact by remember { mutableStateOf<PhoneContact?>(null) }
 
     LaunchedEffect(Unit) {
         vm.refreshContacts()
     }
 
-    val filteredClients = remember(clientContacts, query) {
-        if (query.isBlank()) clientContacts
-        else clientContacts.filter {
-            it.name.contains(query, ignoreCase = true) ||
-            it.phone.contains(query) ||
-            it.machines.contains(query, ignoreCase = true)
+    val mergedContacts = remember(phoneContacts, clientContacts) {
+        val clientByPhone = mutableMapOf<String, ClientContact>()
+        clientContacts.forEach { client ->
+            val key = client.phone.replace(Regex("[^0-9+]"), "").takeLast(7)
+            if (key.length >= 4) clientByPhone[key] = client
         }
+
+        val usedClientIds = mutableSetOf<Long>()
+        val merged = mutableListOf<MergedContact>()
+
+        phoneContacts.forEach { pc ->
+            val phoneKey = pc.phone.replace(Regex("[^0-9+]"), "").takeLast(7)
+            val client = if (phoneKey.length >= 4) clientByPhone[phoneKey] else null
+            if (client != null) usedClientIds.add(client.id)
+            val machines = if (client != null && client.machines.isNotBlank()) {
+                client.machines.split(",").size
+            } else 0
+            merged.add(MergedContact(
+                name = pc.name,
+                phone = pc.phone,
+                clientContact = client,
+                machineCount = machines
+            ))
+        }
+
+        clientContacts.filter { it.id !in usedClientIds }.forEach { client ->
+            val machines = if (client.machines.isNotBlank()) {
+                client.machines.split(",").size
+            } else 0
+            merged.add(MergedContact(
+                name = client.name,
+                phone = client.phone,
+                clientContact = client,
+                machineCount = machines
+            ))
+        }
+
+        merged.sortedWith(compareByDescending<MergedContact> { it.machineCount > 0 }
+            .thenBy { it.name.lowercase() })
     }
 
-    val filteredPhone = remember(phoneContacts, query) {
-        if (query.isBlank()) phoneContacts
-        else phoneContacts.filter {
+    val filteredContacts = remember(mergedContacts, query) {
+        if (query.isBlank()) mergedContacts
+        else mergedContacts.filter {
             it.name.contains(query, ignoreCase = true) ||
-            it.phone.contains(query)
+            it.phone.contains(query) ||
+            (it.clientContact?.machines?.contains(query, ignoreCase = true) == true)
         }
     }
 
@@ -104,8 +140,9 @@ fun ContactsTab(vm: MainViewModel) {
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(Modifier.height(4.dp))
+                val withMachines = mergedContacts.count { it.machineCount > 0 }
                 Text(
-                    "${clientContacts.size} clienti registrati",
+                    "${'$'}{mergedContacts.size} contatti \u2022 ${'$'}withMachines con macchine",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -116,7 +153,7 @@ fun ContactsTab(vm: MainViewModel) {
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("Cerca cliente, macchina, seriale...") },
+                    placeholder = { Text("Cerca contatto, macchina, seriale...") },
                     leadingIcon = {
                         Icon(Icons.Default.Search, null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -133,192 +170,99 @@ fun ContactsTab(vm: MainViewModel) {
                 Spacer(Modifier.height(8.dp))
             }
 
-            // Empty state
-            if (filteredClients.isEmpty() && query.isBlank()) {
+            if (filteredContacts.isEmpty()) {
                 item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                        )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 48.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                Icons.Default.PersonAdd, null,
-                                Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(Modifier.height(12.dp))
+                        Icon(
+                            Icons.Default.People, null,
+                            Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            if (phoneContacts.isEmpty())
+                                "Nessun contatto trovato"
+                            else "Nessun risultato per \"${'$'}query\"",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (phoneContacts.isEmpty()) {
                             Text(
-                                "Nessun cliente registrato",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                "Premi + per aggiungere un cliente\ncon macchine e seriali",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                                "Verifica i permessi della rubrica",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
                         }
                     }
                 }
             }
 
-            // Client contacts list
-            items(filteredClients, key = { it.id }) { contact ->
-                ClientContactCard(
-                    contact = contact,
-                    onEdit = {
-                        editContact = contact
+            items(filteredContacts, key = { "${'$'}{it.name}_${'$'}{it.phone}" }) { mc ->
+                MergedContactCard(
+                    mc = mc,
+                    onTap = {
+                        if (mc.clientContact != null) {
+                            editContact = mc.clientContact
+                            editPhoneContact = null
+                        } else {
+                            editContact = null
+                            editPhoneContact = PhoneContact(mc.name, mc.phone)
+                        }
                         showDialog = true
                     },
-                    onDelete = { vm.deleteClientContact(contact) }
+                    onDeleteMachines = {
+                        mc.clientContact?.let { vm.deleteClientContact(it) }
+                    }
                 )
-            }
-
-            // Rubrica section
-            item {
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showRubrica = !showRubrica },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.People, null,
-                            Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "Rubrica telefono (${filteredPhone.size})",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Icon(
-                        if (showRubrica) Icons.Default.ExpandLess
-                        else Icons.Default.ExpandMore,
-                        null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Divider(modifier = Modifier.padding(top = 8.dp))
-            }
-
-            if (showRubrica || query.isNotBlank()) {
-                if (filteredPhone.isEmpty()) {
-                    item {
-                        Text(
-                            if (phoneContacts.isEmpty())
-                                "Nessun contatto trovato. Verifica i permessi."
-                            else "Nessun risultato",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 16.dp)
-                        )
-                    }
-                }
-                items(filteredPhone) { contact ->
-                    PhoneContactCard(contact)
-                }
             }
 
             item { Spacer(Modifier.height(80.dp)) }
         }
-
-        // FAB - always visible
-        FloatingActionButton(
-            onClick = {
-                editContact = null
-                showDialog = true
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(20.dp),
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            shape = CircleShape
-        ) {
-            Icon(Icons.Default.Add, "Nuovo cliente")
-        }
     }
 
     if (showDialog) {
-        EditClientContactDialog(
-            contact = editContact,
-            vm = vm,
-            onDismiss = { showDialog = false },
-            onSave = { client ->
-                vm.upsertClientContact(client)
-                showDialog = false
-            }
-        )
-    }
-}
-
-@Composable
-private fun PhoneContactCard(contact: PhoneContact) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    contact.name.firstOrNull()?.uppercase() ?: "?",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            Column {
-                Text(contact.name, style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    contact.phone,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+        val contactToEdit = editContact ?: editPhoneContact?.let { pc ->
+            ClientContact(name = pc.name, phone = pc.phone)
+        }
+        if (contactToEdit != null) {
+            EditClientContactDialog(
+                contact = if (contactToEdit.id == 0L) null else contactToEdit,
+                prefillName = contactToEdit.name,
+                prefillPhone = contactToEdit.phone,
+                prefillMachines = contactToEdit.machines,
+                vm = vm,
+                onDismiss = {
+                    showDialog = false
+                    editContact = null
+                    editPhoneContact = null
+                },
+                onSave = { client ->
+                    vm.upsertClientContact(client)
+                    showDialog = false
+                    editContact = null
+                    editPhoneContact = null
+                }
+            )
         }
     }
 }
 
 @Composable
-private fun ClientContactCard(
-    contact: ClientContact,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
+private fun MergedContactCard(
+    mc: MergedContact,
+    onTap: () -> Unit,
+    onDeleteMachines: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val machines = remember(contact.machines) {
-        if (contact.machines.isBlank()) emptyList()
-        else contact.machines.split(",").map { s ->
+    val machines = remember(mc.clientContact?.machines) {
+        val str = mc.clientContact?.machines ?: ""
+        if (str.isBlank()) emptyList()
+        else str.split(",").map { s ->
             val parts = s.trim().split("|")
             SerialEntry(parts.getOrElse(0) { "" }, parts.getOrElse(1) { "" })
         }
@@ -343,29 +287,34 @@ private fun ClientContactCard(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                        .background(
+                            if (machines.isNotEmpty())
+                                MaterialTheme.colorScheme.primaryContainer
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        contact.name.firstOrNull()?.uppercase() ?: "?",
+                        mc.name.firstOrNull()?.uppercase() ?: "?",
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
+                        color = if (machines.isNotEmpty())
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 Spacer(Modifier.width(12.dp))
+
                 Column(modifier = Modifier.weight(1f)) {
+                    Text(mc.name, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        contact.name,
-                        style = MaterialTheme.typography.titleMedium
+                        mc.phone,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (contact.phone.isNotBlank()) {
-                        Text(
-                            contact.phone,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                 }
+
                 if (machines.isNotEmpty()) {
                     Box(
                         modifier = Modifier
@@ -374,7 +323,7 @@ private fun ClientContactCard(
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            "${machines.size} macch.",
+                            "${'$'}{machines.size} macch.",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = VNGreen
@@ -382,9 +331,9 @@ private fun ClientContactCard(
                     }
                     Spacer(Modifier.width(4.dp))
                 }
+
                 Icon(
-                    if (expanded) Icons.Default.ExpandLess
-                    else Icons.Default.ExpandMore,
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                     null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -401,13 +350,13 @@ private fun ClientContactCard(
                                 Icon(
                                     Icons.Default.Build, null,
                                     Modifier.size(14.dp),
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = VNGreen
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 Text(
                                     buildString {
-                                        append("SN: ${m.number}")
-                                        if (m.model.isNotBlank()) append(" \u2014 ${m.model}")
+                                        append("SN: ${'$'}{m.number}")
+                                        if (m.model.isNotBlank()) append(" \u2014 ${'$'}{m.model}")
                                     },
                                     style = MaterialTheme.typography.bodyMedium
                                 )
@@ -415,7 +364,7 @@ private fun ClientContactCard(
                         }
                     } else {
                         Text(
-                            "Nessuna macchina \u2014 premi Modifica per aggiungere",
+                            "Nessuna macchina assegnata \u2014 tocca per aggiungere",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -425,17 +374,20 @@ private fun ClientContactCard(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
-                        IconButton(onClick = onEdit) {
+                        IconButton(onClick = onTap) {
                             Icon(
-                                Icons.Default.Edit, "Modifica",
+                                if (machines.isEmpty()) Icons.Default.Add else Icons.Default.Edit,
+                                if (machines.isEmpty()) "Aggiungi macchine" else "Modifica",
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
-                        IconButton(onClick = onDelete) {
-                            Icon(
-                                Icons.Default.Delete, "Elimina",
-                                tint = MaterialTheme.colorScheme.error
-                            )
+                        if (machines.isNotEmpty()) {
+                            IconButton(onClick = onDeleteMachines) {
+                                Icon(
+                                    Icons.Default.Delete, "Rimuovi macchine",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
                 }

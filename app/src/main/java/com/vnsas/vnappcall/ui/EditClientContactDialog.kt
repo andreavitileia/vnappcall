@@ -15,7 +15,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -49,19 +48,22 @@ import com.vnsas.vnappcall.ui.theme.VNGreen
 @Composable
 fun EditClientContactDialog(
     contact: ClientContact?,
+    prefillName: String = "",
+    prefillPhone: String = "",
+    prefillMachines: String = "",
     vm: MainViewModel,
     onDismiss: () -> Unit,
     onSave: (ClientContact) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var name by remember { mutableStateOf(contact?.name ?: "") }
-    var phone by remember { mutableStateOf(contact?.phone ?: "") }
-    var showPhonePicker by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf(contact?.name ?: prefillName) }
+    var phone by remember { mutableStateOf(contact?.phone ?: prefillPhone) }
 
     val machines = remember {
         val list = mutableStateListOf<SerialEntry>()
-        if (contact != null && contact.machines.isNotBlank()) {
-            contact.machines.split(",").forEach { s ->
+        val src = contact?.machines ?: prefillMachines
+        if (src.isNotBlank()) {
+            src.split(",").forEach { s ->
                 val parts = s.trim().split("|")
                 list.add(SerialEntry(parts.getOrElse(0) { "" }, parts.getOrElse(1) { "" }))
             }
@@ -88,50 +90,25 @@ fun EditClientContactDialog(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = if (contact == null) "Nuovo Cliente" else "Modifica Cliente",
+                text = if (contact == null) "Gestisci Macchine" else "Modifica Macchine",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = 8.dp)
             )
-
-            // Name + rubrica picker
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Nome cliente") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    shape = fieldShape,
-                    colors = fieldColors
+            Text(
+                text = name,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            if (phone.isNotBlank()) {
+                Text(
+                    text = phone,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                IconButton(onClick = { showPhonePicker = true }) {
-                    Icon(
-                        Icons.Default.Contacts,
-                        "Da rubrica",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                }
             }
 
-            Spacer(Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = phone,
-                onValueChange = { phone = it },
-                label = { Text("Telefono") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                shape = fieldShape,
-                colors = fieldColors
-            )
-
-            // ===== MACHINES SECTION =====
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -156,7 +133,6 @@ fun EditClientContactDialog(
 
                     Spacer(Modifier.height(12.dp))
 
-                    // Existing machines
                     machines.forEachIndexed { idx, entry ->
                         Row(
                             modifier = Modifier
@@ -197,7 +173,6 @@ fun EditClientContactDialog(
                         }
                     }
 
-                    // Add machine button - prominent
                     Button(
                         onClick = { machines.add(SerialEntry()) },
                         modifier = Modifier.fillMaxWidth(),
@@ -216,7 +191,6 @@ fun EditClientContactDialog(
 
             Spacer(Modifier.height(20.dp))
 
-            // Save / Cancel
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
@@ -230,7 +204,7 @@ fun EditClientContactDialog(
                     onClick = {
                         val machinesStr = machines
                             .filter { it.number.isNotBlank() || it.model.isNotBlank() }
-                            .joinToString(",") { "${it.number}|${it.model}" }
+                            .joinToString(",") { "${'$'}{it.number}|${'$'}{it.model}" }
                         onSave(
                             ClientContact(
                                 id = contact?.id ?: 0,
@@ -240,23 +214,10 @@ fun EditClientContactDialog(
                             )
                         )
                     },
-                    enabled = name.isNotBlank(),
                     shape = RoundedCornerShape(14.dp)
                 ) { Text("Salva") }
             }
             Spacer(Modifier.height(24.dp))
         }
-    }
-
-    if (showPhonePicker) {
-        ContactPickerDialog(
-            vm = vm,
-            onDismiss = { showPhonePicker = false },
-            onSelect = { c ->
-                name = c.name
-                phone = c.phone
-                showPhonePicker = false
-            }
-        )
     }
 }

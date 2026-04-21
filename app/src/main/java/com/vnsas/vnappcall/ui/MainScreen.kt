@@ -5,11 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.Assessment
 import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.Settings
@@ -33,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
@@ -48,7 +45,6 @@ private data class NavItem(
 private val navItems = listOf(
     NavItem("Chiamate", Icons.Filled.Call, Icons.Outlined.Call),
     NavItem("Clienti", Icons.Filled.People, Icons.Outlined.People),
-    NavItem("Report", Icons.Filled.Assessment, Icons.Outlined.Assessment),
     NavItem("Impostazioni", Icons.Filled.Settings, Icons.Outlined.Settings),
 )
 
@@ -112,8 +108,7 @@ fun MainScreen(vm: MainViewModel) {
             when (selectedTab) {
                 0 -> CallsTab(vm = vm)
                 1 -> ContactsTab(vm = vm)
-                2 -> ReportTab(vm = vm)
-                3 -> SettingsTab(vm = vm)
+                2 -> SettingsTab(vm = vm)
             }
 
             if (loading) {
