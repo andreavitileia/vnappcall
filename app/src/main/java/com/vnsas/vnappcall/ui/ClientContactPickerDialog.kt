@@ -16,8 +16,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -28,7 +28,6 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,31 +36,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vnsas.vnappcall.MainViewModel
-import com.vnsas.vnappcall.util.PhoneContact
+import com.vnsas.vnappcall.data.ClientContact
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ContactPickerDialog(
+fun ClientContactPickerDialog(
     vm: MainViewModel,
     onDismiss: () -> Unit,
-    onSelect: (PhoneContact) -> Unit
+    onSelect: (ClientContact) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val contacts by vm.contacts.collectAsState()
+    val clientContacts by vm.clientContacts.collectAsState()
     var query by remember { mutableStateOf("") }
 
-    // Auto-load contacts when dialog opens
-    LaunchedEffect(Unit) {
-        vm.refreshContacts()
-    }
-
-    val filtered = remember(contacts, query) {
-        if (query.isBlank()) contacts
-        else contacts.filter {
+    val filtered = remember(clientContacts, query) {
+        if (query.isBlank()) clientContacts
+        else clientContacts.filter {
             it.name.contains(query, ignoreCase = true) ||
-            it.phone.contains(query)
+            it.phone.contains(query) ||
+            it.machines.contains(query, ignoreCase = true)
         }
     }
 
@@ -76,15 +72,16 @@ fun ContactPickerDialog(
                 .padding(horizontal = 16.dp)
         ) {
             Text(
-                "Rubrica",
+                "Seleziona cliente",
                 style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text("Cerca contatto...") },
+                placeholder = { Text("Cerca cliente...") },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
@@ -98,25 +95,10 @@ fun ContactPickerDialog(
 
             Spacer(Modifier.height(8.dp))
 
-            if (contacts.isEmpty()) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(32.dp),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "Caricamento rubrica...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else if (filtered.isEmpty()) {
+            if (filtered.isEmpty()) {
                 Text(
-                    "Nessun contatto trovato",
+                    if (clientContacts.isEmpty()) "Nessun cliente registrato.\nVai al tab Clienti per aggiungerne."
+                    else "Nessun risultato",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 24.dp, bottom = 24.dp)
@@ -124,7 +106,10 @@ fun ContactPickerDialog(
             }
 
             LazyColumn {
-                items(filtered) { contact ->
+                items(filtered, key = { it.id }) { contact ->
+                    val machineCount = if (contact.machines.isBlank()) 0
+                        else contact.machines.split(",").size
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -144,13 +129,34 @@ fun ContactPickerDialog(
                             )
                         }
                         Spacer(Modifier.width(12.dp))
-                        Column {
-                            Text(contact.name, style = MaterialTheme.typography.titleSmall)
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                contact.phone,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                contact.name,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
                             )
+                            if (contact.phone.isNotBlank()) {
+                                Text(
+                                    contact.phone,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        if (machineCount > 0) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Build, null,
+                                    Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    "$machineCount macch.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                     Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))

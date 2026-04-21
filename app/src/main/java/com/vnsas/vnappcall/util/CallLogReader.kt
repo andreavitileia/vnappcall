@@ -37,8 +37,8 @@ object CallLogReader {
                         count++
                     }
                 }
-            } catch (_: SecurityException) {
-                // Permission not granted
+            } catch (_: Throwable) {
+                // Permission not granted or other error
             }
             entries
         }
@@ -74,8 +74,8 @@ object CallLogReader {
                     )
                 }
             }
-        } catch (_: SecurityException) {
-            // Permission not granted
+        } catch (_: Throwable) {
+            // Permission not granted or other error
         }
         entries
     }

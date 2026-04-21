@@ -13,14 +13,18 @@ data class MailSettings(
     val autoEnabled: Boolean = false,
     val autoHour: Int = 8,
     val autoMinute: Int = 0,
-    val portalUrl: String = "",
+    val portalUrl: String = "https://king-prawn-app-ugucb.ondigitalocean.app",
     val apiKey: String = "vnappcall-reports-key-2025"
 )
 
 private const val PREFS = "mail_prefs"
+private const val DEFAULT_PORTAL_URL = "https://king-prawn-app-ugucb.ondigitalocean.app"
+private const val DEFAULT_API_KEY = "vnappcall-reports-key-2025"
 
 fun Context.loadMailSettings(): MailSettings {
     val p = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    val storedPortalUrl = p.getString("portalUrl", "") ?: ""
+    val storedApiKey = p.getString("apiKey", "") ?: ""
     return MailSettings(
         host = p.getString("host", "") ?: "",
         port = p.getString("port", "587") ?: "587",
@@ -32,8 +36,8 @@ fun Context.loadMailSettings(): MailSettings {
         autoEnabled = p.getBoolean("autoEnabled", false),
         autoHour = p.getInt("autoHour", 8),
         autoMinute = p.getInt("autoMinute", 0),
-        portalUrl = p.getString("portalUrl", "") ?: "",
-        apiKey = p.getString("apiKey", "vnappcall-reports-key-2025") ?: "vnappcall-reports-key-2025"
+        portalUrl = storedPortalUrl.ifBlank { DEFAULT_PORTAL_URL },
+        apiKey = storedApiKey.ifBlank { DEFAULT_API_KEY }
     )
 }
 
