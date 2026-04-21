@@ -130,6 +130,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Track if initial auto-sync has been done
     private var initialSyncDone = false
 
+    // Sync status for UI feedback
+    private val _syncStatus = MutableStateFlow<String?>(null)
+    val syncStatus: StateFlow<String?> = _syncStatus.asStateFlow()
+    fun clearSyncStatus() { _syncStatus.value = null }
+
     fun refreshCallLog() {
         viewModelScope.launch {
             _callLog.value = CallLogReader.loadRecent(ctx, 100)
@@ -144,15 +149,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Called from Application.onCreate() to ensure sync starts immediately,
+     * even before any UI tab is shown.
+     */
+    fun initAutoSync() {
+        if (!initialSyncDone) {
+            initialSyncDone = true
+            viewModelScope.launch {
+                _callLog.value = CallLogReader.loadRecent(ctx, 100)
+                syncAllCallsToPortal()
+                startPeriodicSync()
+            }
+        }
+    }
+
+    /**
      * Sync ALL calls from the phone log (merged with annotations) to the portal.
      * This ensures all calls appear on the portal, not just annotated ones.
      */
     fun syncAllCallsToPortal() {
         viewModelScope.launch {
             try {
+                _syncStatus.value = "Sincronizzazione in corso..."
                 val settings = ctx.loadMailSettings()
+                Log.d("MainViewModel", "syncAllCalls: portalUrl='${settings.portalUrl}', apiKey='${settings.apiKey.take(8)}...'")
                 if (settings.portalUrl.isBlank() || settings.apiKey.isBlank()) {
-                    Log.d("MainViewModel", "syncAllCalls: skipped (no portal settings)")
+                    Log.e("MainViewModel", "syncAllCalls: SKIPPED - portalUrl or apiKey is blank!")
+                    _syncStatus.value = "Errore: URL portale o API key mancante"
                     return@launch
                 }
 
@@ -173,7 +196,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 Log.d("MainViewModel", "syncAllCalls: ${todayCalls.size} calls from phone log for $dateStr")
 
                 if (todayCalls.isEmpty()) {
-                    Log.d("MainViewModel", "syncAllCalls: no calls today, skipping")
+                    Log.d("MainViewModel", "syncAllCalls: no calls today, trying recent calls")
+                    // Fallback: sync recent calls if no calls today
+                    val recentCalls = _callLog.value
+                    if (recentCalls.isEmpty()) {
+                        _syncStatus.value = "Nessuna chiamata trovata oggi"
+                        return@launch
+                    }
+                    // Group recent calls by date and sync each date
+                    val callsByDate = recentCalls.groupBy { PortalSync.formatDate(it.date) }
+                    var successCount = 0
+                    for ((date, calls) in callsByDate) {
+                        val dateCal = Calendar.getInstance().apply {
+                            timeInMillis = calls.first().date
+                            set(Calendar.HOUR_OF_DAY, 0)
+                            set(Calendar.MINUTE, 0)
+                            set(Calendar.SECOND, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }
+                        val dStart = dateCal.timeInMillis
+                        dateCal.add(Calendar.DAY_OF_YEAR, 1)
+                        val dEnd = dateCal.timeInMillis
+                        val notes = dao.getBetween(dStart, dEnd)
+                        val ok = PortalSync.uploadAllCalls(
+                            settings.portalUrl, settings.apiKey, date,
+                            calls, notes
+                        )
+                        if (ok) successCount++
+                    }
+                    _syncStatus.value = "Sincronizzate $successCount/${callsByDate.size} giornate"
                     return@launch
                 }
 
@@ -188,11 +239,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 if (ok) {
                     Log.d("MainViewModel", "syncAllCalls OK: $dateStr (${todayCalls.size} calls)")
+                    _syncStatus.value = "Sincronizzate ${todayCalls.size} chiamate per $dateStr"
                 } else {
                     Log.e("MainViewModel", "syncAllCalls FAILED: $dateStr")
+                    _syncStatus.value = "Errore sincronizzazione per $dateStr"
                 }
             } catch (e: Throwable) {
                 Log.e("MainViewModel", "syncAllCalls error", e)
+                _syncStatus.value = "Errore: ${e.message ?: "errore sconosciuto"}"
             }
         }
     }

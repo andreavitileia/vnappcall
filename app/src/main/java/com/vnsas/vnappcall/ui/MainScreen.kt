@@ -55,6 +55,11 @@ fun MainScreen(vm: MainViewModel) {
     val snackMsg by vm.snackbar.collectAsState()
     val loading by vm.loading.collectAsState()
 
+    // Trigger auto-sync on app startup, regardless of which tab is active
+    LaunchedEffect(Unit) {
+        vm.initAutoSync()
+    }
+
     LaunchedEffect(snackMsg) {
         snackMsg?.let {
             snackbarHostState.showSnackbar(it)

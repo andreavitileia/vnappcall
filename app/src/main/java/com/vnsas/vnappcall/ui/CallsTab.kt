@@ -75,6 +75,7 @@ import java.util.Locale
 fun CallsTab(vm: MainViewModel) {
     val callLog by vm.callLog.collectAsState()
     val allNotes by vm.allNotes.collectAsState()
+    val syncStatus by vm.syncStatus.collectAsState()
     var filter by remember { mutableIntStateOf(0) }
     var showDialog by remember { mutableStateOf(false) }
     var editNote by remember { mutableStateOf<CallNote?>(null) }
@@ -123,6 +124,14 @@ fun CallsTab(vm: MainViewModel) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                syncStatus?.let { status ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        status,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (status.startsWith("Errore")) VNRed else VNGreen
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
             }
 
