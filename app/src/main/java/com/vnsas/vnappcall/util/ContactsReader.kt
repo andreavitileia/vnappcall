@@ -26,12 +26,20 @@ object ContactsReader {
             )
             cursor?.use {
                 while (it.moveToNext()) {
-                    val name = it.getString(0) ?: continue
-                    val phone = it.getString(1) ?: continue
-                    contacts += PhoneContact(name, phone)
+                    try {
+                        val name = it.getString(0) ?: continue
+                        val phone = it.getString(1) ?: continue
+                        if (name.isNotBlank() && phone.isNotBlank()) {
+                            contacts += PhoneContact(name.trim(), phone.trim())
+                        }
+                    } catch (_: Throwable) {
+                        // Skip malformed contact entry
+                    }
                 }
             }
-        } catch (_: SecurityException) { }
+        } catch (_: Throwable) {
+            // Permission not granted or other error
+        }
         contacts.distinctBy { it.name + it.phone }
     }
 }

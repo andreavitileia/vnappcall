@@ -76,44 +76,56 @@ fun ContactsTab(vm: MainViewModel) {
     }
 
     val mergedContacts = remember(phoneContacts, clientContacts) {
-        val clientByPhone = mutableMapOf<String, ClientContact>()
-        clientContacts.forEach { client ->
-            val key = client.phone.replace(Regex("[^0-9+]"), "").takeLast(7)
-            if (key.length >= 4) clientByPhone[key] = client
+        try {
+            val clientByPhone = mutableMapOf<String, ClientContact>()
+            clientContacts.forEach { client ->
+                val key = client.phone.replace(Regex("[^0-9+]"), "").takeLast(7)
+                if (key.length >= 4) clientByPhone[key] = client
+            }
+
+            val usedClientIds = mutableSetOf<Long>()
+            val merged = mutableListOf<MergedContact>()
+
+            phoneContacts.forEach { pc ->
+                try {
+                    val phoneKey = pc.phone.replace(Regex("[^0-9+]"), "").takeLast(7)
+                    val client = if (phoneKey.length >= 4) clientByPhone[phoneKey] else null
+                    if (client != null) usedClientIds.add(client.id)
+                    val machines = if (client != null && client.machines.isNotBlank()) {
+                        client.machines.split(",").size
+                    } else 0
+                    merged.add(MergedContact(
+                        name = pc.name,
+                        phone = pc.phone,
+                        clientContact = client,
+                        machineCount = machines
+                    ))
+                } catch (_: Throwable) {
+                    // Skip problematic contact
+                }
+            }
+
+            clientContacts.filter { it.id !in usedClientIds }.forEach { client ->
+                try {
+                    val machines = if (client.machines.isNotBlank()) {
+                        client.machines.split(",").size
+                    } else 0
+                    merged.add(MergedContact(
+                        name = client.name,
+                        phone = client.phone,
+                        clientContact = client,
+                        machineCount = machines
+                    ))
+                } catch (_: Throwable) {
+                    // Skip problematic client contact
+                }
+            }
+
+            merged.sortedWith(compareByDescending<MergedContact> { it.machineCount > 0 }
+                .thenBy { it.name.lowercase() })
+        } catch (_: Throwable) {
+            emptyList()
         }
-
-        val usedClientIds = mutableSetOf<Long>()
-        val merged = mutableListOf<MergedContact>()
-
-        phoneContacts.forEach { pc ->
-            val phoneKey = pc.phone.replace(Regex("[^0-9+]"), "").takeLast(7)
-            val client = if (phoneKey.length >= 4) clientByPhone[phoneKey] else null
-            if (client != null) usedClientIds.add(client.id)
-            val machines = if (client != null && client.machines.isNotBlank()) {
-                client.machines.split(",").size
-            } else 0
-            merged.add(MergedContact(
-                name = pc.name,
-                phone = pc.phone,
-                clientContact = client,
-                machineCount = machines
-            ))
-        }
-
-        clientContacts.filter { it.id !in usedClientIds }.forEach { client ->
-            val machines = if (client.machines.isNotBlank()) {
-                client.machines.split(",").size
-            } else 0
-            merged.add(MergedContact(
-                name = client.name,
-                phone = client.phone,
-                clientContact = client,
-                machineCount = machines
-            ))
-        }
-
-        merged.sortedWith(compareByDescending<MergedContact> { it.machineCount > 0 }
-            .thenBy { it.name.lowercase() })
     }
 
     val filteredContacts = remember(mergedContacts, query) {
@@ -202,7 +214,8 @@ fun ContactsTab(vm: MainViewModel) {
                 }
             }
 
-            items(filteredContacts, key = { "${'$'}{it.name}_${'$'}{it.phone}" }) { mc ->
+            items(filteredContacts.size) { index ->
+                val mc = filteredContacts[index]
                 MergedContactCard(
                     mc = mc,
                     onTap = {
