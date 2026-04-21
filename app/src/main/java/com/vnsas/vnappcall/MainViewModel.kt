@@ -169,7 +169,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 Log.d("MainViewModel", "syncToPortal: dateStr=$dateStr")
                 val ok = PortalSync.uploadReport(settings.portalUrl, settings.apiKey, dateStr, notes)
                 Log.d("MainViewModel", "syncToPortal: result=$ok")
-                _snackbar.value = if (ok) "Sincronizzato con il portale!" else "Errore: controlla URL portale nelle impostazioni"
+                _snackbar.value = if (ok) "Sincronizzato con il portale! (${notes.size} note inviate)" else "Errore sync portale: URL=${settings.portalUrl}"
             } catch (e: Throwable) {
                 Log.e("MainViewModel", "syncToPortal failed", e)
                 _snackbar.value = "Errore sync: ${e.message ?: "errore sconosciuto"}"
@@ -196,7 +196,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val count = PortalSync.bulkSync(settings.portalUrl, settings.apiKey, byDate) { cur, total ->
                         Log.d("MainViewModel", "bulkSync progress: $cur/$total")
                     }
-                    _snackbar.value = "Sync completato: $count/${byDate.size} giorni inviati"
+                    _snackbar.value = if (count > 0) "Sync completato: $count/${byDate.size} giorni inviati" else "Errore: nessun giorno sincronizzato su ${byDate.size}"
                 }
             } catch (e: Throwable) {
                 Log.e("MainViewModel", "bulkSync failed", e)

@@ -4,18 +4,28 @@ import android.util.Log
 import com.vnsas.vnappcall.data.CallNote
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 object PortalSync {
 
     private const val TAG = "PortalSync"
+
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .build()
+
+    private val JSON_MEDIA = "application/json; charset=utf-8".toMediaType()
 
     suspend fun uploadReport(
         portalUrl: String,
@@ -23,13 +33,14 @@ object PortalSync {
         dateStr: String,
         items: List<CallNote>
     ): Boolean = withContext(Dispatchers.IO) {
-        Log.d(TAG, "uploadReport: url=$portalUrl, date=$dateStr, items=${items.size}")
+        Log.d(TAG, "uploadReport called: url='$portalUrl', apiKey='${apiKey.take(5)}...', date=$dateStr, items=${items.size}")
+
         if (portalUrl.isBlank() || apiKey.isBlank()) {
-            Log.e(TAG, "uploadReport: portalUrl or apiKey is blank! url='$portalUrl' key='$apiKey'")
+            Log.e(TAG, "ABORT: portalUrl or apiKey is blank! url='$portalUrl' key='$apiKey'")
             return@withContext false
         }
         if (!portalUrl.startsWith("http")) {
-            Log.e(TAG, "uploadReport: portalUrl doesn't start with http: '$portalUrl'")
+            Log.e(TAG, "ABORT: portalUrl doesn't start with http: '$portalUrl'")
             return@withContext false
         }
 
@@ -71,33 +82,33 @@ object PortalSync {
             }
 
             val fullUrl = "${portalUrl.trimEnd('/')}/api/reports"
-            Log.d(TAG, "POST $fullUrl payload=${payload.toString().take(500)}")
+            val payloadStr = payload.toString()
+            Log.d(TAG, "POST $fullUrl")
+            Log.d(TAG, "Payload (first 500): ${payloadStr.take(500)}")
 
-            val url = URL(fullUrl)
-            val conn = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                setRequestProperty("X-Reports-Api-Key", apiKey)
-                connectTimeout = 15_000
-                readTimeout = 15_000
-                doOutput = true
-            }
+            val request = Request.Builder()
+                .url(fullUrl)
+                .addHeader("Content-Type", "application/json; charset=UTF-8")
+                .addHeader("X-Reports-Api-Key", apiKey)
+                .post(payloadStr.toRequestBody(JSON_MEDIA))
+                .build()
 
-            OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use {
-                it.write(payload.toString())
-            }
-
-            val code = conn.responseCode
-            val body = try {
-                if (code in 200..299) conn.inputStream.bufferedReader().readText()
-                else conn.errorStream?.bufferedReader()?.readText() ?: "no body"
-            } catch (_: Throwable) { "read error" }
-            conn.disconnect()
+            val response = httpClient.newCall(request).execute()
+            val code = response.code
+            val body = response.body?.string() ?: "empty body"
+            response.close()
 
             Log.d(TAG, "Response: code=$code body=$body")
-            code in 200..299
+
+            if (code in 200..299) {
+                Log.d(TAG, "SUCCESS: Upload completed")
+                true
+            } else {
+                Log.e(TAG, "FAILED: HTTP $code - $body")
+                false
+            }
         } catch (e: Throwable) {
-            Log.e(TAG, "uploadReport failed", e)
+            Log.e(TAG, "EXCEPTION in uploadReport: ${e.javaClass.simpleName}: ${e.message}", e)
             false
         }
     }
@@ -110,15 +121,23 @@ object PortalSync {
     ): Int = withContext(Dispatchers.IO) {
         var success = 0
         val dates = notesByDate.keys.sorted()
+        Log.d(TAG, "bulkSync: ${dates.size} dates to sync")
         for ((i, date) in dates.withIndex()) {
             val items = notesByDate[date] ?: continue
             try {
-                if (uploadReport(portalUrl, apiKey, date, items)) success++
-            } catch (_: Throwable) {
-                // Skip failed dates, continue with rest
+                Log.d(TAG, "bulkSync: syncing date $date with ${items.size} items")
+                if (uploadReport(portalUrl, apiKey, date, items)) {
+                    success++
+                    Log.d(TAG, "bulkSync: date $date OK")
+                } else {
+                    Log.e(TAG, "bulkSync: date $date FAILED")
+                }
+            } catch (e: Throwable) {
+                Log.e(TAG, "bulkSync: date $date EXCEPTION: ${e.message}", e)
             }
             onProgress(i + 1, dates.size)
         }
+        Log.d(TAG, "bulkSync complete: $success/${dates.size} succeeded")
         success
     }
 
