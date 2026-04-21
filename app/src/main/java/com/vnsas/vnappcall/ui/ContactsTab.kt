@@ -53,12 +53,14 @@ import com.vnsas.vnappcall.data.ClientContact
 import com.vnsas.vnappcall.data.SerialEntry
 import com.vnsas.vnappcall.ui.theme.VNGreen
 import com.vnsas.vnappcall.util.PhoneContact
+import androidx.compose.ui.graphics.Color
 
 private data class MergedContact(
     val name: String,
     val phone: String,
     val clientContact: ClientContact?,
-    val machineCount: Int
+    val machineCount: Int,
+    val statusFlag: Int = 0
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -98,7 +100,8 @@ fun ContactsTab(vm: MainViewModel) {
                         name = pc.name,
                         phone = pc.phone,
                         clientContact = client,
-                        machineCount = machines
+                        machineCount = machines,
+                        statusFlag = client?.statusFlag ?: 0
                     ))
                 } catch (_: Throwable) {
                     // Skip problematic contact
@@ -114,7 +117,8 @@ fun ContactsTab(vm: MainViewModel) {
                         name = client.name,
                         phone = client.phone,
                         clientContact = client,
-                        machineCount = machines
+                        machineCount = machines,
+                        statusFlag = client.statusFlag
                     ))
                 } catch (_: Throwable) {
                     // Skip problematic client contact
@@ -296,26 +300,38 @@ private fun MergedContactCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (machines.isNotEmpty())
-                                MaterialTheme.colorScheme.primaryContainer
+                // Semaphore dot + Avatar
+                Box(contentAlignment = Alignment.TopEnd) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (machines.isNotEmpty())
+                                    MaterialTheme.colorScheme.primaryContainer
+                                else
+                                    MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            mc.name.firstOrNull()?.uppercase() ?: "?",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (machines.isNotEmpty())
+                                MaterialTheme.colorScheme.primary
                             else
-                                MaterialTheme.colorScheme.surfaceVariant
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        mc.name.firstOrNull()?.uppercase() ?: "?",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (machines.isNotEmpty())
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    // Status flag dot
+                    if (mc.clientContact != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(14.dp)
+                                .clip(CircleShape)
+                                .background(statusColor(mc.statusFlag))
+                        )
+                    }
                 }
                 Spacer(Modifier.width(12.dp))
 

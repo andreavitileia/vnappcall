@@ -3,6 +3,7 @@ package com.vnsas.vnappcall.util
 import android.util.Log
 import com.vnsas.vnappcall.data.CallLogEntry
 import com.vnsas.vnappcall.data.CallNote
+import com.vnsas.vnappcall.data.ClientContact
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -151,7 +152,8 @@ object PortalSync {
         apiKey: String,
         dateStr: String,
         callLogEntries: List<CallLogEntry>,
-        annotations: List<CallNote>
+        annotations: List<CallNote>,
+        clientContacts: List<ClientContact> = emptyList()
     ): Boolean = withContext(Dispatchers.IO) {
         Log.d(TAG, "uploadAllCalls: url='$portalUrl', date=$dateStr, calls=${callLogEntries.size}, annotations=${annotations.size}")
 
@@ -192,6 +194,18 @@ object PortalSync {
                 val contactName = entry.name ?: note?.contactName ?: (entry.number ?: "Sconosciuto")
                 val phone = entry.number ?: note?.phone ?: ""
 
+                // Look up client status
+                val clientStatus = clientContacts.find { client ->
+                    val cDigits = client.phone.replace(Regex("[^0-9+]"), "")
+                    cDigits.length >= 4 && cDigits.takeLast(7) == phoneSuffix
+                }?.statusFlag ?: 0
+                val statusText = when (clientStatus) {
+                    0 -> "GREEN"
+                    1 -> "YELLOW"
+                    2 -> "RED"
+                    else -> "GREEN"
+                }
+
                 val row = JSONObject().apply {
                     put("timestamp", entry.date)
                     put("time", dfTime.format(Date(entry.date)))
@@ -206,6 +220,7 @@ object PortalSync {
                     put("resolved", note?.resolved ?: false)
                     put("serials", serialsArray)
                     put("callType", entry.readableType)
+                    put("clientStatus", statusText)
                 }
                 rows.put(row)
             }

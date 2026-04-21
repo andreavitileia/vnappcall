@@ -9,5 +9,6 @@ data class ClientContact(
     val id: Long = 0,
     val name: String = "",
     val phone: String = "",
-    val machines: String = ""  // Format: "serial1|model1,serial2|model2"
+    val machines: String = "",  // Format: "serial1|model1,serial2|model2"
+    val statusFlag: Int = 0     // 0=green (good), 1=yellow (past issues), 2=red (current issues)
 )

@@ -95,6 +95,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val dayNotes = dao.getBetween(dayStart, dayEnd)
             Log.d("MainViewModel", "autoSync: date=$dateStr, calls=${dayCalls.size}, notes=${dayNotes.size}")
 
+            // Get client contacts for status lookup
+            val clients = contactDao.getAll()
+
             if (dayCalls.isEmpty() && dayNotes.isEmpty()) {
                 // Send empty report to clear the date on the portal
                 PortalSync.uploadReport(settings.portalUrl, settings.apiKey, dateStr, emptyList())
@@ -102,7 +105,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // Upload all calls merged with annotations
                 val ok = PortalSync.uploadAllCalls(
                     settings.portalUrl, settings.apiKey, dateStr,
-                    dayCalls, dayNotes
+                    dayCalls, dayNotes, clients
                 )
                 if (ok) {
                     Log.d("MainViewModel", "autoSync OK: $dateStr (${dayCalls.size} calls, ${dayNotes.size} annotations)")
@@ -191,6 +194,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val dayEnd = cal.timeInMillis
                 val dateStr = PortalSync.formatDate(dayStart)
 
+                // Get client contacts for status lookup
+                val clients = contactDao.getAll()
+
                 // Get today's calls from phone log
                 val todayCalls = CallLogReader.loadInDateRange(ctx, dayStart, dayEnd)
                 Log.d("MainViewModel", "syncAllCalls: ${todayCalls.size} calls from phone log for $dateStr")
@@ -220,7 +226,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val notes = dao.getBetween(dStart, dEnd)
                         val ok = PortalSync.uploadAllCalls(
                             settings.portalUrl, settings.apiKey, date,
-                            calls, notes
+                            calls, notes, clients
                         )
                         if (ok) successCount++
                     }
@@ -235,7 +241,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 // Upload all calls merged with annotations
                 val ok = PortalSync.uploadAllCalls(
                     settings.portalUrl, settings.apiKey, dateStr,
-                    todayCalls, todayAnnotations
+                    todayCalls, todayAnnotations, clients
                 )
                 if (ok) {
                     Log.d("MainViewModel", "syncAllCalls OK: $dateStr (${todayCalls.size} calls)")
@@ -293,9 +299,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (todayCalls.isEmpty()) return
 
             val todayAnnotations = dao.getBetween(dayStart, dayEnd)
+            val clients = contactDao.getAll()
             PortalSync.uploadAllCalls(
                 settings.portalUrl, settings.apiKey, dateStr,
-                todayCalls, todayAnnotations
+                todayCalls, todayAnnotations, clients
             )
         } catch (e: Throwable) {
             Log.e("MainViewModel", "syncAllCallsSilent error", e)

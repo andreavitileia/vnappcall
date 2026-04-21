@@ -1,5 +1,8 @@
 package com.vnsas.vnappcall.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -38,10 +42,14 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.vnsas.vnappcall.MainViewModel
 import com.vnsas.vnappcall.data.ClientContact
@@ -49,6 +57,24 @@ import com.vnsas.vnappcall.data.SerialEntry
 import com.vnsas.vnappcall.ui.theme.VNGreen
 
 val MACHINE_TYPES = listOf("SM225", "EUROSPEEDY", "SMM", "SM3000", "SM7000", "SMONE")
+
+val StatusGreen = Color(0xFF4CAF50)
+val StatusYellow = Color(0xFFFFC107)
+val StatusRed = Color(0xFFF44336)
+
+fun statusColor(flag: Int): Color = when (flag) {
+    0 -> StatusGreen
+    1 -> StatusYellow
+    2 -> StatusRed
+    else -> StatusGreen
+}
+
+fun statusLabel(flag: Int): String = when (flag) {
+    0 -> "Buon cliente"
+    1 -> "Problemi passati"
+    2 -> "Problemi attuali"
+    else -> "Buon cliente"
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +90,7 @@ fun EditClientContactDialog(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var name by remember { mutableStateOf(contact?.name ?: prefillName) }
     var phone by remember { mutableStateOf(contact?.phone ?: prefillPhone) }
+    var statusFlag by remember { mutableIntStateOf(contact?.statusFlag ?: 0) }
 
     val machines = remember {
         val list = mutableStateListOf<SerialEntry>()
@@ -112,6 +139,141 @@ fun EditClientContactDialog(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // --- SEMAPHORE STATUS ---
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = statusColor(statusFlag).copy(alpha = 0.08f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        "Stato Cliente",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = statusColor(statusFlag)
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Seleziona lo stato del cliente",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        // Green button
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { statusFlag = 0 }
+                                .then(
+                                    if (statusFlag == 0) Modifier
+                                        .background(StatusGreen.copy(alpha = 0.15f))
+                                        .border(2.dp, StatusGreen, RoundedCornerShape(12.dp))
+                                    else Modifier
+                                        .background(Color.Transparent)
+                                )
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(StatusGreen)
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "Buono",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (statusFlag == 0) FontWeight.Bold else FontWeight.Normal,
+                                color = if (statusFlag == 0) StatusGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        // Yellow button
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { statusFlag = 1 }
+                                .then(
+                                    if (statusFlag == 1) Modifier
+                                        .background(StatusYellow.copy(alpha = 0.15f))
+                                        .border(2.dp, StatusYellow, RoundedCornerShape(12.dp))
+                                    else Modifier
+                                        .background(Color.Transparent)
+                                )
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(StatusYellow)
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "Attenzione",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (statusFlag == 1) FontWeight.Bold else FontWeight.Normal,
+                                color = if (statusFlag == 1) StatusYellow else MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        // Red button
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { statusFlag = 2 }
+                                .then(
+                                    if (statusFlag == 2) Modifier
+                                        .background(StatusRed.copy(alpha = 0.15f))
+                                        .border(2.dp, StatusRed, RoundedCornerShape(12.dp))
+                                    else Modifier
+                                        .background(Color.Transparent)
+                                )
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(StatusRed)
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "Problema",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (statusFlag == 2) FontWeight.Bold else FontWeight.Normal,
+                                color = if (statusFlag == 2) StatusRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        statusLabel(statusFlag),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = statusColor(statusFlag),
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
 
             Spacer(Modifier.height(16.dp))
@@ -274,7 +436,8 @@ fun EditClientContactDialog(
                                 id = contact?.id ?: 0,
                                 name = name,
                                 phone = phone,
-                                machines = machinesStr
+                                machines = machinesStr,
+                                statusFlag = statusFlag
                             )
                         )
                     },
